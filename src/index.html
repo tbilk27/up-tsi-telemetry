@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VW Up! TSI Telemetry & Diagnostic Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header / Top Control Bar -->
+    <header class="top-bar">
+      <div class="brand">
+        <div class="vw-emblem">VW</div>
+        <div class="brand-text">
+          <span class="model-name">up!</span>
+          <span class="tsi-badge">TSI</span>
+          <span class="edition-badge">SPEED</span>
+        </div>
+      </div>
+
+      <div class="connection-controls">
+        <div class="status-indicator">
+          <span class="status-dot disconnected" id="statusDot"></span>
+          <span class="status-text" id="statusText">Desconectado</span>
+        </div>
+
+        <select id="portSelect" class="port-select">
+          <option value="COM8">COM8 (OBDII Bluetooth)</option>
+        </select>
+
+        <button id="btnConnect" class="btn btn-primary">Conectar</button>
+        <button id="btnSimulation" class="btn btn-secondary">Simulação Demo</button>
+        <button id="btnDatalog" class="btn btn-danger">
+          <span class="rec-dot"></span> Gravar Datalog (CSV)
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Gauges -->
+    <main class="dashboard-grid">
+      <!-- Left: Tachometer (RPM) -->
+      <section class="gauge-card tach-card">
+        <div class="gauge-header">
+          <h3>CONTA-GIROS</h3>
+          <span class="gauge-unit">RPM x1000</span>
+        </div>
+
+        <!-- Shift Light Bar -->
+        <div class="shift-light-bar" id="shiftLightBar">
+          <div class="led led-green"></div>
+          <div class="led led-green"></div>
+          <div class="led led-yellow"></div>
+          <div class="led led-yellow"></div>
+          <div class="led led-red"></div>
+          <div class="led led-red"></div>
+          <div class="led led-shift"></div>
+          <div class="led led-shift"></div>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="tachCanvas" width="360" height="360"></canvas>
+          <div class="gauge-digital-center">
+            <span class="digital-val" id="valRpm">0</span>
+            <span class="digital-label">RPM</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center: Speedometer, Gear & Quick Stats -->
+      <section class="center-cluster">
+        <!-- Digital Speedometer -->
+        <div class="speed-box">
+          <span class="speed-number" id="valSpeed">0</span>
+          <span class="speed-unit">KM/H</span>
+        </div>
+
+        <!-- Gear Box Display -->
+        <div class="gear-indicator">
+          <span class="gear-label">MARCHA</span>
+          <div class="gear-display" id="valGear">N</div>
+        </div>
+
+        <!-- Peak Boost Display -->
+        <div class="peak-box">
+          <span class="peak-label">PICO DE PRESSÃO</span>
+          <span class="peak-val" id="valPeakBoost">0.00 bar</span>
+        </div>
+
+        <div class="quick-flags">
+          <div class="flag-item" id="flagIntercooler">
+            <span class="flag-dot"></span> Intercooler OK
+          </div>
+          <div class="flag-item" id="flagLambda">
+            <span class="flag-dot"></span> Mistura OK
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Turbo Boost Pressure Gauge -->
+      <section class="gauge-card boost-card">
+        <div class="gauge-header">
+          <h3>PRESSÃO DE TURBO</h3>
+          <span class="gauge-unit">BOOST / VACUUM (BAR)</span>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="boostCanvas" width="360" height="360"></canvas>
+          <div class="gauge-digital-center">
+            <span class="digital-val" id="valBoostBar">0.00</span>
+            <span class="digital-label" id="valBoostPsi">0.0 PSI</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Telemetry Cards Grid (Sensor Telemetry) -->
+    <section class="telemetry-grid">
+      <!-- Coolant Temp -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Líquido de Arrefecimento</span>
+          <span class="sensor-value" id="valCoolant">-- °C</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="barCoolant" style="width: 0%"></div>
+        </div>
+        <span class="sensor-sub">Faixa ideal: 85°C - 95°C</span>
+      </div>
+
+      <!-- Intake Air Temp (IAT) -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Ar Admitido (IAT)</span>
+          <span class="sensor-value" id="valIat">-- °C</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill iat-fill" id="barIat" style="width: 0%"></div>
+        </div>
+        <span class="sensor-sub">Eficiência do Intercooler</span>
+      </div>
+
+      <!-- MAP Pressure -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Pressão no Coletor (MAP)</span>
+          <span class="sensor-value" id="valMap">-- kPa</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="barMap" style="width: 0%"></div>
+        </div>
+        <span class="sensor-sub">Pressão Absoluta</span>
+      </div>
+
+      <!-- Throttle (TPS) -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Posição da Borboleta (TPS)</span>
+          <span class="sensor-value" id="valTps">0 %</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill tps-fill" id="barTps" style="width: 0%"></div>
+        </div>
+        <span class="sensor-sub">Abertura do Acelerador</span>
+      </div>
+
+      <!-- Engine Load -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Carga do Motor</span>
+          <span class="sensor-value" id="valLoad">0 %</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="barLoad" style="width: 0%"></div>
+        </div>
+        <span class="sensor-sub">Calculada pela ECU</span>
+      </div>
+
+      <!-- Timing Advance -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Avanço de Ignição</span>
+          <span class="sensor-value" id="valTiming">0.0 °</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill timing-fill" id="barTiming" style="width: 50%"></div>
+        </div>
+        <span class="sensor-sub">Ponto do Motor (APMS)</span>
+      </div>
+
+      <!-- Fuel Trim (STFT & LTFT) -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Ajustes Combustível</span>
+          <span class="sensor-value" id="valFuelTrim">S: 0% | L: 0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill trim-fill" id="barTrim" style="width: 50%"></div>
+        </div>
+        <span class="sensor-sub">Correção Curto / Longo Prazo</span>
+      </div>
+
+      <!-- Battery Voltage -->
+      <div class="sensor-card">
+        <div class="sensor-info">
+          <span class="sensor-name">Tensão da Bateria</span>
+          <span class="sensor-value" id="valVoltage">-- V</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill volt-fill" id="barVoltage" style="width: 0%"></div>
+        </div>
+        <span class="sensor-sub" id="lblVoltStatus">Chave ligada / Alternador</span>
+      </div>
+    </section>
+
+    <!-- Bottom Diagnostic & Info Panel -->
+    <footer class="bottom-panel">
+      <div class="ecu-meta">
+        <div class="meta-item"><span class="meta-label">VIN:</span> <span id="valVin" class="meta-val">9BWAH4124HT516995</span></div>
+        <div class="meta-item"><span class="meta-label">MODELO:</span> <span class="meta-val">VW Speed Up! TSI 1.0 12V (2017)</span></div>
+        <div class="meta-item"><span class="meta-label">ECU / REDE:</span> <span id="valProto" class="meta-val">Bosch MED17 / CAN 11/500</span></div>
+        <div class="meta-item"><span class="meta-label">DATALOG:</span> <span id="valLogStatus" class="meta-val">Inativo</span></div>
+      </div>
+
+      <div class="dtc-controls">
+        <button id="btnScanDtc" class="btn btn-sm btn-outline">Escanear Falhas (DTC)</button>
+        <button id="btnClearDtc" class="btn btn-sm btn-outline-danger">Apagar Falhas (MIL)</button>
+      </div>
+    </footer>
+
+    <!-- DTC Result Modal / Banner -->
+    <div id="dtcModal" class="dtc-modal hidden">
+      <div class="dtc-modal-content">
+        <div class="dtc-modal-header">
+          <h4>DIAGNÓSTICO DA ECU — CÓDIGOS DE FALHA</h4>
+          <button id="btnCloseDtc" class="btn-close">&times;</button>
+        </div>
+        <div class="dtc-modal-body" id="dtcBody">
+          Nenhuma verificação executada ainda.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

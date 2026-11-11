@@ -1,0 +1,57 @@
+{
+  "name": "up-tsi-telemetry",
+  "version": "1.0.0",
+  "description": "Dashboard de Telemetria e Diagnóstico para VW Up! TSI",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "mock": "electron . --mock",
+    "build:mac": "electron-builder --mac zip",
+    "build:win": "electron-builder --win",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": [
+    "obd2",
+    "elm327",
+    "vw-up-tsi",
+    "telemetry",
+    "dashboard",
+    "macos",
+    "windows"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "build": {
+    "appId": "com.antigravity.uptsi",
+    "productName": "Up! TSI Telemetry",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "obd-worker.js",
+      "src/**/*",
+      "package.json"
+    ]
+  },
+  "dependencies": {
+    "electron": "^45.3.0",
+    "serialport": "^13.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.7.0"
+  }
+}
