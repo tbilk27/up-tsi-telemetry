@@ -5,6 +5,7 @@ node_modules/
 dist/
 out/
 build/
+*.apk
 
 # Datalog files
 logs/*.csv
