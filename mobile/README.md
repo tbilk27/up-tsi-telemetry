@@ -4,6 +4,23 @@ Aplicativo mobile em **Flutter** para monitoramento de telemetria em tempo real,
 
 ---
 
+## 🏎️ Navegação por Gesto de Arraste (Swipe)
+
+O aplicativo possui navegação horizontal nativa entre duas páginas:
+
+* **Página 1 (Painel de Telemetria):**
+  * Conta-giros esportivo (0-7.000 RPM) com **Shift Light progressivo** (8 LEDs).
+  * Manômetro de Pressão de Turbo (-1.0 bar a +2.0 bar) com indicador de pico (*Peak Hold*).
+  * Velocímetro em km/h com estimador de marcha (N, 1ª a 5ª).
+  * 8 cards de telemetria dos sensores com barras dinâmicas.
+* **Página 2 (Alertas, Mensagens e Erros da Injeção) — *Ao arrastar para o lado*:**
+  * **Alertas Críticos em Tempo Real:** Monitora se o motor está superaquecendo (> 102°C), se o ar de admissão está saturado (> 55°C), mistura fora de faixa (STFT/LTFT) ou tensão de bateria anormal.
+  * **Status da Luz de Injeção (MIL):** Indica se a lâmpada de anomalia da central Bosch MED17 está acesa ou apagada.
+  * **Códigos de Falha da Injeção (DTCs):** Lista as falhas ativas com descrições automáticas para a linha TSI EA211.
+  * **Botão Destacado: "Apagar Erros (MIL)":** Envia o comando Modo 04 via OBD-II para zerar a memória da central e apagar a luz da injeção no painel.
+
+---
+
 ## 📲 Como Transferir e Instalar no seu Celular
 
 ### Opção 1: Direto pelo Computador via USB (Desenvolvedor)
@@ -37,17 +54,3 @@ Basta transferir esse arquivo para o celular (via WhatsApp, Google Drive ou cabo
    * Toque na pílula de status no canto superior direito (**CONECTAR**).
    * O aplicativo listará os dispositivos pareados destacando a tag **OBDII**.
    * Toque em **Conectar**.
-
----
-
-## 🎮 Modo Simulação (Sem Carro)
-* Na tela de conexão Bluetooth, você também pode tocar em **"Ativar Modo Simulação (Testar Sem Carro)"** para ver os mostradores acelerando, as trocas de marcha e a subida de pressão de turbo mesmo fora do veículo.
-
----
-
-## 🏎️ Recursos do App Mobile
-* **Orientação Horizontal e Vertical:** O painel se ajusta automaticamente para quando o celular estiver colocado no suporte de painel ou parabrisa.
-* **Tachometer com Shift Light:** 8 LEDs de aviso progressivo com flash ciano acima de 5.800 RPM.
-* **Manômetro de Turbo com Peak Hold:** Mostrador com vácuo (-1.0 bar) a pressão positiva (+2.0 bar) e indicador de pico de pressão retido.
-* **Velocímetro & Indicador de Marcha:** Mostra a marcha estimada (N, 1ª a 5ª) baseado na relação de transmissão do Up! TSI.
-* **Diagnóstico de Falhas (DTC):** Varredura e limpeza da luz da injeção com dicionário de códigos do motor TSI (EA211).
