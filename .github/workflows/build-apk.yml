@@ -66,13 +66,20 @@ jobs:
             
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git checkout -b build-error-log
-            cp ../build.log build-error.log
-            git add build-error.log
+            git checkout -B build-error-log
+            cp ../build.log build_error.txt
+            git add -f build_error.txt
             git commit -m "build error log [skip ci]"
             git push origin build-error-log -f || true
             exit $BUILD_STATUS
           fi
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-artifact
+          path: build.log
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
