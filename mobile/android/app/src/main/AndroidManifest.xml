@@ -19,8 +19,7 @@
     <application
         android:label="Up! TSI Telemetry"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:theme="@android:style/Theme.Black.NoTitleBar">
+        android:icon="@android:drawable/sym_def_app_icon">
 
         <!-- Specify Android v2 Embedding -->
         <meta-data
