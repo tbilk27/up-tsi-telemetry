@@ -19,6 +19,8 @@ subprojects {
         afterEvaluate { p ->
             if (p.hasProperty('android')) {
                 p.android {
+                    compileSdkVersion 34
+                    buildToolsVersion "34.0.0"
                     if (namespace == null || namespace.isEmpty()) {
                         namespace = (p.group != null && !p.group.isEmpty()) ? p.group : "com.antigravity.${p.name.replace('-', '_')}"
                     }
