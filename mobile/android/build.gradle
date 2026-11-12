@@ -11,11 +11,17 @@ subprojects {
 }
 
 subprojects {
-    project.afterEvaluate { p ->
-        if (p.hasProperty('android')) {
-            p.android {
-                if (namespace == null) {
-                    namespace p.group
+    project.evaluationDependsOn(':app')
+}
+
+subprojects {
+    if (project.path != ':app') {
+        afterEvaluate { p ->
+            if (p.hasProperty('android')) {
+                p.android {
+                    if (namespace == null || namespace.isEmpty()) {
+                        namespace = (p.group != null && !p.group.isEmpty()) ? p.group : "com.antigravity.${p.name.replace('-', '_')}"
+                    }
                 }
             }
         }

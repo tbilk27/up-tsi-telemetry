@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -28,6 +28,22 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Regenerate Native Android Wrapper & Resources
+        run: |
+          cd mobile
+          mkdir -p /tmp/mobile_backup
+          cp -f android/app/src/main/AndroidManifest.xml /tmp/mobile_backup/AndroidManifest.xml || true
+          cp -f android/build.gradle /tmp/mobile_backup/build.gradle || true
+          cp -f android/app/build.gradle /tmp/mobile_backup/app_build.gradle || true
+          cp -f android/settings.gradle /tmp/mobile_backup/settings.gradle || true
+
+          flutter create . --platforms=android
+
+          cp -f /tmp/mobile_backup/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          cp -f /tmp/mobile_backup/build.gradle android/build.gradle
+          cp -f /tmp/mobile_backup/app_build.gradle android/app/build.gradle
+          cp -f /tmp/mobile_backup/settings.gradle android/settings.gradle
+
       - name: Install Dependencies
         run: |
           cd mobile
@@ -36,7 +52,27 @@ jobs:
       - name: Build APK (Release)
         run: |
           cd mobile
-          flutter build apk --release --no-tree-shake-icons
+          set +e
+          flutter build apk --release --no-tree-shake-icons > ../build.log 2>&1
+          BUILD_STATUS=$?
+          if [ $BUILD_STATUS -ne 0 ]; then
+            echo "::error::Flutter build failed with code $BUILD_STATUS"
+            echo "==================== BUILD ERROR OUTPUT ===================="
+            tail -n 250 ../build.log
+            echo "## ❌ Android Build Failure Log" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            tail -n 250 ../build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -b build-error-log
+            cp ../build.log build-error.log
+            git add build-error.log
+            git commit -m "build error log [skip ci]"
+            git push origin build-error-log -f || true
+            exit $BUILD_STATUS
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
