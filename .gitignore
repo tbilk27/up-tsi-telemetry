@@ -5,7 +5,26 @@ node_modules/
 dist/
 out/
 build/
+**/build/
 *.apk
+
+# Flutter & Dart
+.dart_tool/
+**/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+**/.pub-cache/
+**/.pub/
+**/GeneratedPluginRegistrant.java
+
+# Android
+.gradle/
+**/.gradle/
+**/local.properties
+**/GeneratedPluginRegistrant.java
+**/*.keystore
+**/*.jks
 
 # Datalog files
 logs/*.csv

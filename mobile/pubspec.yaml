@@ -1,7 +1,7 @@
 name: up_tsi_telemetry
 description: "Dashboard de Telemetria e Diagnostico para VW Up! TSI (Android / iOS)"
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.0+7
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

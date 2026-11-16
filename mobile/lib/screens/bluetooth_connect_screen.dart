@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:provider/provider.dart';
 import '../services/obd_bluetooth_service.dart';
+import 'obd_terminal_screen.dart';
 
 class BluetoothConnectScreen extends StatefulWidget {
   const BluetoothConnectScreen({Key? key}) : super(key: key);
@@ -49,6 +50,16 @@ class _BluetoothConnectScreenState extends State<BluetoothConnectScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Terminal & Logs OBDII',
+            icon: const Icon(Icons.terminal, color: Color(0xFF00E5FF)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ObdTerminalScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _loadDevices,
           ),
@@ -80,7 +91,7 @@ class _BluetoothConnectScreenState extends State<BluetoothConnectScreen> {
                     boxShadow: [
                       BoxShadow(
                         color: obd.isConnected
-                            ? const Color(0xFF00E676).withOpacity(0.6)
+                            ? const Color(0xFF00E676).withValues(alpha: 0.6)
                             : Colors.transparent,
                         blurRadius: 8,
                       ),
@@ -225,7 +236,7 @@ class _BluetoothConnectScreenState extends State<BluetoothConnectScreen> {
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: isObd
-                                    ? const Color(0xFFE51A24).withOpacity(0.5)
+                                    ? const Color(0xFFE51A24).withValues(alpha: 0.5)
                                     : const Color(0xFF242E42),
                               ),
                             ),

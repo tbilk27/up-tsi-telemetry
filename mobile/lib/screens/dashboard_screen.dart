@@ -6,6 +6,7 @@ import '../widgets/boost_gauge.dart';
 import '../widgets/shift_light_bar.dart';
 import '../widgets/sensor_card.dart';
 import 'bluetooth_connect_screen.dart';
+import 'obd_terminal_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -14,10 +15,13 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+enum FullscreenGauge { none, tachometer, boost, center }
+
 class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _isScanning = false;
+  FullscreenGauge _fullscreenGauge = FullscreenGauge.none;
 
   @override
   void dispose() {
@@ -166,21 +170,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final obd = Provider.of<ObdBluetoothService>(context);
     final data = obd.data;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (_fullscreenGauge != FullscreenGauge.none) {
+      return _buildFullscreenView(obd, data, isLandscape);
+    }
+
     final liveAlerts = _getLiveAlerts(data);
     final totalIssues = liveAlerts.length + data.dtcs.length;
 
+    // Shift light ativo no momento configurado de trocar de marcha
+    final isShiftPoint = data.rpm >= obd.shiftRpm;
+    const shiftYellow = Color(0xFFFFEA00); // Tom de amarelo elétrico mais vivo
+    const defaultBg = Color(0xFF0A0D14);
+    final currentBg = isShiftPoint ? shiftYellow : defaultBg;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0D14),
+      backgroundColor: currentBg,
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar with Navigation Tabs
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF121722),
-                border: Border(bottom: BorderSide(color: Color(0xFF242E42))),
+            // Alerta visual de Shift Light quando RPM atinge o ponto de troca
+            if (isShiftPoint)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                color: shiftYellow,
+                child: const Center(
+                  child: Text(
+                    '⚡ SHIFT UP • TROQUE DE MARCHA ⚡',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
               ),
+
+            // Top Bar with Navigation Tabs (ocultada automaticamente quando o celular estiver na horizontal)
+            if (!isLandscape)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF121722),
+                  border: Border(bottom: BorderSide(color: Color(0xFF242E42))),
+                ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -246,51 +282,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
 
-                  // Bluetooth Status Pill
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const BluetoothConnectScreen(),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F131A),
+                  // Actions: Terminal OBD & Bluetooth Status Pill
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Terminal & Logs OBDII',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: const Icon(Icons.terminal, color: Color(0xFF8B9BB4), size: 18),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ObdTerminalScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BluetoothConnectScreen(),
+                            ),
+                          );
+                        },
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF242E42)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: obd.isConnected
-                                  ? const Color(0xFF00E676)
-                                  : const Color(0xFFFF5252),
-                            ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F131A),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF242E42)),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            obd.isSimulating
-                                ? 'MOCK'
-                                : (obd.isConnected ? 'OBDII ON' : 'CONECTAR'),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFC0CDE0),
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: obd.isConnected
+                                      ? const Color(0xFF00E676)
+                                      : const Color(0xFFFF5252),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                obd.isSimulating
+                                    ? 'MOCK'
+                                    : (obd.isConnected ? 'OBDII ON' : 'CONECTAR'),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFC0CDE0),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -306,7 +362,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
                 children: [
                   // PAGE 0: Main Telemetry Dashboard
-                  _buildTelemetryDashboardPage(data, isLandscape),
+                  _buildTelemetryDashboardPage(obd, data, isLandscape, isShiftPoint),
 
                   // PAGE 1: Alerts, Messages & DTC Errors Page
                   _buildAlertsAndErrorsPage(obd, data, liveAlerts),
@@ -387,45 +443,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // =========================================================================
   // PAGE 0: Telemetry Dashboard
   // =========================================================================
-  Widget _buildTelemetryDashboardPage(data, bool isLandscape) {
+  Widget _buildTelemetryDashboardPage(
+    ObdBluetoothService obd,
+    dynamic data,
+    bool isLandscape,
+    bool isShiftPoint,
+  ) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
         children: [
-          // Shift Light Bar
-          ShiftLightBar(rpm: data.rpm),
+          // Shift Light Bar adaptativa
+          ShiftLightBar(rpm: data.rpm, shiftRpm: obd.shiftRpm),
           const SizedBox(height: 8),
 
-          // Gauges Row
+          // Gauges Row (com duplo toque para tela cheia)
           if (isLandscape)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                TachometerGauge(rpm: data.rpm, size: 230),
-                _buildCenterCluster(data),
+                TachometerGauge(
+                  rpm: data.rpm,
+                  size: 230,
+                  isShiftPoint: isShiftPoint,
+                  onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.tachometer),
+                ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.center),
+                  child: _buildCenterCluster(data, isShiftPoint: isShiftPoint),
+                ),
                 BoostGauge(
                   boostBar: data.boostBar,
                   boostPsi: data.boostPsi,
                   peakBoostBar: data.peakBoostBar,
+                  dynamicPeakBar: data.dynamicPeakBoostBar,
                   size: 230,
+                  isShiftPoint: isShiftPoint,
+                  onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.boost),
                 ),
               ],
             )
-          else
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TachometerGauge(rpm: data.rpm, size: 175),
-                _buildCenterCluster(data),
-                BoostGauge(
-                  boostBar: data.boostBar,
-                  boostPsi: data.boostPsi,
-                  peakBoostBar: data.peakBoostBar,
-                  size: 175,
-                ),
-              ],
+          else ...[
+            // Layout Vertical (Portrait):
+            // 1. No topo: Marcha e Velocidade um ao lado do outro
+            _buildPortraitSpeedAndGearBar(data, isShiftPoint: isShiftPoint),
+            const SizedBox(height: 12),
+
+            // 2. Os 2 gauges um acima do outro (Conta-giros e Pressão do Turbo)
+            TachometerGauge(
+              rpm: data.rpm,
+              size: 215,
+              isShiftPoint: isShiftPoint,
+              onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.tachometer),
             ),
+            const SizedBox(height: 14),
+            BoostGauge(
+              boostBar: data.boostBar,
+              boostPsi: data.boostPsi,
+              peakBoostBar: data.peakBoostBar,
+              dynamicPeakBar: data.dynamicPeakBoostBar,
+              size: 215,
+              isShiftPoint: isShiftPoint,
+              onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.boost),
+            ),
+          ],
 
           const SizedBox(height: 14),
 
@@ -673,6 +756,120 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
 
+          const SizedBox(height: 20),
+
+          // Card de Configuração do Shift-Light RPM
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141A28),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFFFFEA00).withValues(alpha: 0.35),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.flash_on, color: Color(0xFFFFEA00), size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'PONTO DE TROCA (SHIFT LIGHT)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEA00).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFFEA00)),
+                      ),
+                      child: Text(
+                        '${obd.shiftRpm} RPM',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFFEA00),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Ajuste em passos de 100 RPM quando o alerta amarelo e os LEDs disparam. Faixa ideal de rendimento do Up! TSI: ~5.200 RPM.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF8B9BB4), height: 1.3),
+                ),
+                const SizedBox(height: 12),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFFFFEA00),
+                    inactiveTrackColor: const Color(0xFF263248),
+                    thumbColor: const Color(0xFFFFEA00),
+                    overlayColor: const Color(0xFFFFEA00).withValues(alpha: 0.2),
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    trackHeight: 6,
+                    valueIndicatorColor: const Color(0xFF0D121C),
+                    valueIndicatorTextStyle: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFFEA00),
+                    ),
+                  ),
+                  child: Slider(
+                    value: obd.shiftRpm.toDouble().clamp(4000.0, 6500.0),
+                    min: 4000.0,
+                    max: 6500.0,
+                    divisions: 25, // 25 divisões = passos de exatamente 100 RPM
+                    label: '${obd.shiftRpm} RPM',
+                    onChanged: (newVal) {
+                      obd.setShiftRpm(newVal.round());
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text('4.000 RPM', style: TextStyle(fontSize: 10, color: Color(0xFF677B99))),
+                      Text(
+                        '5.200 (Recomendado TSI)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFFFEA00),
+                        ),
+                      ),
+                      Text('6.500 RPM', style: TextStyle(fontSize: 10, color: Color(0xFF677B99))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 22),
 
           // Section 1: Live Telemetry Alerts
@@ -693,7 +890,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF0D1E16),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF00E676).withOpacity(0.3)),
+                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: const [
@@ -866,37 +1063,441 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // Vertical / Portrait Top Bar: Velocidade e Marcha um ao lado do outro
+  Widget _buildPortraitSpeedAndGearBar(
+    dynamic data, {
+    bool isFullscreen = false,
+    VoidCallback? onExit,
+    bool isShiftPoint = false,
+  }) {
+    final bgColor = isShiftPoint ? const Color(0xFFFFEA00) : const Color(0xFF0E131D);
+    final borderColor = isShiftPoint
+        ? Colors.black
+        : (isFullscreen ? const Color(0xFFE51A24) : const Color(0xFF202B3D));
+    final primaryTextColor = isShiftPoint ? Colors.black : Colors.white;
+    final secondaryTextColor = isShiftPoint ? const Color(0xFF212121) : const Color(0xFF8B9BB4);
+    final gearBorderColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+    final gearTextColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onDoubleTap: () {
+        if (isFullscreen) {
+          if (onExit != null) onExit();
+        } else {
+          setState(() => _fullscreenGauge = FullscreenGauge.center);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: borderColor,
+            width: isShiftPoint ? 2.0 : 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Velocidade
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '${data.speed}',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                    color: primaryTextColor,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'KM/H',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    color: secondaryTextColor,
+                  ),
+                ),
+              ],
+            ),
+
+            // Divisor vertical
+            Container(
+              height: 36,
+              width: 1.5,
+              color: isShiftPoint ? Colors.black26 : const Color(0xFF242E42),
+            ),
+
+            // Marcha
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'MARCHA',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    color: secondaryTextColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isShiftPoint
+                        ? Colors.black.withValues(alpha: 0.08)
+                        : const Color(0xFFE51A24).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: gearBorderColor, width: 2.0),
+                  ),
+                  child: Center(
+                    child: Text(
+                      data.gear,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: gearTextColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Divisor vertical
+            Container(
+              height: 36,
+              width: 1.5,
+              color: isShiftPoint ? Colors.black26 : const Color(0xFF242E42),
+            ),
+
+            // Pico Turbo
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'PICO',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                    color: secondaryTextColor,
+                  ),
+                ),
+                Text(
+                  '${data.peakBoostBar >= 0 ? "+" : ""}${data.peakBoostBar.toStringAsFixed(2)}b',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: isShiftPoint ? Colors.black : const Color(0xFFFF9100),
+                  ),
+                ),
+              ],
+            ),
+
+            if (isFullscreen) ...[
+              const SizedBox(width: 4),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Sair da tela cheia',
+                icon: Icon(Icons.fullscreen_exit, color: primaryTextColor, size: 26),
+                onPressed: onExit,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Lateral Esquerda (Vertical) quando em orientação Paisagem (Horizontal) com Gauge Destacado
+  Widget _buildLandscapeSpeedAndGearSidebar(
+    dynamic data, {
+    VoidCallback? onExit,
+    bool isShiftPoint = false,
+  }) {
+    final bgColor = isShiftPoint ? const Color(0xFFFFEA00) : const Color(0xFF0E131D);
+    final borderColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+    final primaryTextColor = isShiftPoint ? Colors.black : Colors.white;
+    final secondaryTextColor = isShiftPoint ? const Color(0xFF212121) : const Color(0xFF8B9BB4);
+    final gearBorderColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+    final gearTextColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onDoubleTap: onExit,
+      child: Container(
+        width: 125,
+        margin: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 2.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(2, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            // Velocidade
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${data.speed}',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    color: primaryTextColor,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'KM/H',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    color: secondaryTextColor,
+                  ),
+                ),
+              ],
+            ),
+
+            Container(
+              width: 44,
+              height: 1.5,
+              color: isShiftPoint ? Colors.black26 : const Color(0xFF242E42),
+            ),
+
+            // Marcha
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'MARCHA',
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    color: secondaryTextColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isShiftPoint
+                        ? Colors.black.withValues(alpha: 0.08)
+                        : const Color(0xFFE51A24).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: gearBorderColor, width: 2.2),
+                  ),
+                  child: Center(
+                    child: Text(
+                      data.gear,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: gearTextColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            Container(
+              width: 44,
+              height: 1.5,
+              color: isShiftPoint ? Colors.black26 : const Color(0xFF242E42),
+            ),
+
+            // Pico Turbo
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'PICO TURBO',
+                  style: TextStyle(
+                    fontSize: 8.0,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                    color: secondaryTextColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${data.peakBoostBar >= 0 ? "+" : ""}${data.peakBoostBar.toStringAsFixed(2)}b',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: isShiftPoint ? Colors.black : const Color(0xFFFF9100),
+                  ),
+                ),
+              ],
+            ),
+
+            // Botão sair do destaque
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Sair da tela cheia',
+              icon: Icon(
+                Icons.fullscreen_exit,
+                color: primaryTextColor,
+                size: 26,
+              ),
+              onPressed: onExit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Center Speed & Gear Cluster
-  Widget _buildCenterCluster(data) {
+  Widget _buildCenterCluster(dynamic data, {bool isFullscreen = false, bool isShiftPoint = false}) {
+    final primaryTextColor = isShiftPoint ? Colors.black : Colors.white;
+    final secondaryTextColor = isShiftPoint ? Colors.black87 : const Color(0xFF8B9BB4);
+    final cardBgColor = isShiftPoint ? Colors.black.withValues(alpha: 0.08) : const Color(0xFF0E131D);
+    final cardBorderColor = isShiftPoint ? Colors.black45 : const Color(0xFF202B3D);
+    final gearBorderColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+    final gearTextColor = isShiftPoint ? Colors.black : const Color(0xFFE51A24);
+    final gearBgColor = isShiftPoint ? Colors.black.withValues(alpha: 0.08) : const Color(0xFFE51A24).withValues(alpha: 0.12);
+    final peakColor = isShiftPoint ? Colors.black : const Color(0xFFFF9100);
+
+    if (isFullscreen) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorderColor, width: 2),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '${data.speed}',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 84,
+                    fontWeight: FontWeight.w900,
+                    color: primaryTextColor,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'VELOCIDADE (KM/H)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2.0,
+                    color: secondaryTextColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              color: gearBgColor,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: gearBorderColor, width: 3.0),
+            ),
+            child: Center(
+              child: Text(
+                data.gear,
+                style: TextStyle(
+                  fontSize: 54,
+                  fontWeight: FontWeight.w900,
+                  color: gearTextColor,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'PICO DE TURBO: ${data.peakBoostBar >= 0 ? "+" : ""}${data.peakBoostBar.toStringAsFixed(2)} bar',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: peakColor,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF0E131D),
+            color: cardBgColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF202B3D)),
+            border: Border.all(color: cardBorderColor),
           ),
           child: Column(
             children: [
               Text(
                 '${data.speed}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 40,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: primaryTextColor,
                   height: 1.0,
                 ),
               ),
-              const Text(
+              Text(
                 'KM/H',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
-                  color: Color(0xFF8B9BB4),
+                  color: secondaryTextColor,
                 ),
               ),
             ],
@@ -907,17 +1508,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            color: const Color(0xFFE51A24).withOpacity(0.08),
+            color: gearBgColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE51A24), width: 1.8),
+            border: Border.all(color: gearBorderColor, width: 1.8),
           ),
           child: Center(
             child: Text(
               data.gear,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFFE51A24),
+                color: gearTextColor,
               ),
             ),
           ),
@@ -925,14 +1526,256 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 6),
         Text(
           'PICO: ${data.peakBoostBar >= 0 ? "+" : ""}${data.peakBoostBar.toStringAsFixed(2)} bar',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Color(0xFFFF9100),
+            color: peakColor,
           ),
         ),
       ],
     );
+  }
+
+  // Fullscreen Gauge View
+  Widget _buildFullscreenView(ObdBluetoothService obd, dynamic data, bool isLandscape) {
+    final media = MediaQuery.of(context);
+    final availableHeight = media.size.height - media.padding.top - media.padding.bottom;
+    final availableWidth = media.size.width - media.padding.left - media.padding.right;
+
+    final isShiftPoint = data.rpm >= obd.shiftRpm;
+    const shiftYellow = Color(0xFFFFEA00);
+    const defaultBg = Color(0xFF0A0D14);
+    final currentBg = isShiftPoint ? shiftYellow : defaultBg;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        setState(() => _fullscreenGauge = FullscreenGauge.none);
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: () {
+          setState(() => _fullscreenGauge = FullscreenGauge.none);
+        },
+        child: Scaffold(
+          backgroundColor: currentBg,
+          body: SafeArea(
+            child: isLandscape
+                ? _buildLandscapeFullscreenBody(obd, data, isShiftPoint, availableWidth, availableHeight)
+                : _buildPortraitFullscreenBody(obd, data, isShiftPoint, availableWidth, availableHeight, shiftYellow),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLandscapeFullscreenBody(
+    ObdBluetoothService obd,
+    dynamic data,
+    bool isShiftPoint,
+    double availableWidth,
+    double availableHeight,
+  ) {
+    final hasShiftLight = _fullscreenGauge == FullscreenGauge.tachometer;
+    final gaugeSize = hasShiftLight
+        ? (availableHeight - 56).clamp(160.0, 500.0)
+        : (availableHeight - 20).clamp(160.0, 500.0);
+
+    return Row(
+      children: [
+        // 1. Barra vertical à esquerda com Velocidade e Marcha
+        _buildLandscapeSpeedAndGearSidebar(
+          data,
+          isShiftPoint: isShiftPoint,
+          onExit: () => setState(() => _fullscreenGauge = FullscreenGauge.none),
+        ),
+
+        const SizedBox(width: 8),
+
+        // 2. Área principal do gauge expandido
+        Expanded(
+          child: Column(
+            children: [
+              if (isShiftPoint)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  color: Colors.black.withValues(alpha: 0.15),
+                  child: const Center(
+                    child: Text(
+                      '⚡ SHIFT UP • TROQUE DE MARCHA ⚡',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.0,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              if (hasShiftLight) ...[
+                const SizedBox(height: 4),
+                ShiftLightBar(rpm: data.rpm, shiftRpm: obd.shiftRpm),
+                const SizedBox(height: 4),
+              ],
+              Expanded(
+                child: Center(
+                  child: _buildFullscreenGaugeWidget(obd, data, gaugeSize, isShiftPoint),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPortraitFullscreenBody(
+    ObdBluetoothService obd,
+    dynamic data,
+    bool isShiftPoint,
+    double availableWidth,
+    double availableHeight,
+    Color shiftYellow,
+  ) {
+    final gaugeSize = (availableWidth - 24).clamp(
+      180.0,
+      (availableHeight - 170).clamp(180.0, 480.0),
+    );
+
+    return Column(
+      children: [
+        // 1. Shift banner in fullscreen mode
+        if (isShiftPoint)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            color: shiftYellow,
+            child: const Center(
+              child: Text(
+                '⚡ SHIFT UP • TROQUE DE MARCHA ⚡',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2.0,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 4),
+
+        // 2. Card de Velocidade e Marcha mantido no topo ao destacar qualquer gauge
+        _buildPortraitSpeedAndGearBar(
+          data,
+          isFullscreen: true,
+          isShiftPoint: isShiftPoint,
+          onExit: () => setState(() => _fullscreenGauge = FullscreenGauge.none),
+        ),
+
+        const SizedBox(height: 4),
+
+        // 3. Shift Light Bar on top for Tachometer
+        if (_fullscreenGauge == FullscreenGauge.tachometer) ...[
+          ShiftLightBar(rpm: data.rpm, shiftRpm: obd.shiftRpm),
+          const SizedBox(height: 8),
+        ],
+
+        // 4. Fullscreen Gauge Widget
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: _buildFullscreenGaugeWidget(obd, data, gaugeSize, isShiftPoint),
+            ),
+          ),
+        ),
+
+        // 5. Bottom HUD: live quick stats + double tap hint
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10, top: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isShiftPoint ? Colors.black.withValues(alpha: 0.1) : const Color(0xFF121722),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isShiftPoint ? Colors.black45 : const Color(0xFF202A3D),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.touch_app,
+                      size: 13,
+                      color: isShiftPoint ? Colors.black54 : const Color(0xFF7387A8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Duplo toque para restaurar',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isShiftPoint ? Colors.black87 : const Color(0xFF8B9BB4),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      '${data.speed} KM/H  •  M: ${data.gear}',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isShiftPoint ? Colors.black : const Color(0xFF00E676),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFullscreenGaugeWidget(
+    ObdBluetoothService obd,
+    dynamic data,
+    double gaugeSize,
+    bool isShiftPoint,
+  ) {
+    if (_fullscreenGauge == FullscreenGauge.tachometer) {
+      return TachometerGauge(
+        rpm: data.rpm,
+        size: gaugeSize,
+        isShiftPoint: isShiftPoint,
+        onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.none),
+      );
+    } else if (_fullscreenGauge == FullscreenGauge.boost) {
+      return BoostGauge(
+        boostBar: data.boostBar,
+        boostPsi: data.boostPsi,
+        peakBoostBar: data.peakBoostBar,
+        dynamicPeakBar: data.dynamicPeakBoostBar,
+        isShiftPoint: isShiftPoint,
+        size: gaugeSize,
+        onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.none),
+      );
+    } else {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: () => setState(() => _fullscreenGauge = FullscreenGauge.none),
+        child: _buildCenterCluster(data, isFullscreen: true, isShiftPoint: isShiftPoint),
+      );
+    }
   }
 }

@@ -7,6 +7,8 @@ class TelemetryData {
   final double boostBar;
   final double boostPsi;
   final double peakBoostBar;
+  final double dynamicPeakBoostBar;
+  final int shiftRpm;
   final int coolant;
   final int iat;
   final int tps;
@@ -29,6 +31,8 @@ class TelemetryData {
     this.boostBar = 0.0,
     this.boostPsi = 0.0,
     this.peakBoostBar = 0.0,
+    this.dynamicPeakBoostBar = 0.0,
+    this.shiftRpm = 5200,
     this.coolant = 0,
     this.iat = 0,
     this.tps = 0,
@@ -52,6 +56,8 @@ class TelemetryData {
     double? boostBar,
     double? boostPsi,
     double? peakBoostBar,
+    double? dynamicPeakBoostBar,
+    int? shiftRpm,
     int? coolant,
     int? iat,
     int? tps,
@@ -74,6 +80,8 @@ class TelemetryData {
       boostBar: boostBar ?? this.boostBar,
       boostPsi: boostPsi ?? this.boostPsi,
       peakBoostBar: peakBoostBar ?? this.peakBoostBar,
+      dynamicPeakBoostBar: dynamicPeakBoostBar ?? this.dynamicPeakBoostBar,
+      shiftRpm: shiftRpm ?? this.shiftRpm,
       coolant: coolant ?? this.coolant,
       iat: iat ?? this.iat,
       tps: tps ?? this.tps,

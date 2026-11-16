@@ -2,14 +2,29 @@ import 'package:flutter/material.dart';
 
 class ShiftLightBar extends StatelessWidget {
   final int rpm;
+  final int shiftRpm;
 
-  const ShiftLightBar({Key? key, required this.rpm}) : super(key: key);
+  const ShiftLightBar({
+    Key? key,
+    required this.rpm,
+    this.shiftRpm = 5200,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // 8 LEDs thresholds: 3800, 4400 (Green), 4900, 5300 (Yellow), 5600, 5800 (Red), 6000, 6200 (Shift Flash)
-    final thresholds = [3800, 4400, 4900, 5300, 5600, 5800, 6000, 6200];
-    final isFlashing = rpm >= 5900;
+    // 8 LEDs com escala adaptativa calculada a partir de shiftRpm
+    final target = shiftRpm;
+    final thresholds = [
+      target - 1500, // LED 1 (Verde)
+      target - 1200, // LED 2 (Verde)
+      target - 900,  // LED 3 (Amarelo)
+      target - 650,  // LED 4 (Amarelo)
+      target - 400,  // LED 5 (Laranja/Vermelho)
+      target - 200,  // LED 6 (Vermelho)
+      target - 100,  // LED 7 (Ciano)
+      target,        // LED 8 (Flash / Shift Up!)
+    ];
+    final isFlashing = rpm >= target;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -48,7 +63,7 @@ class ShiftLightBar extends StatelessWidget {
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: ledColor.withOpacity(0.8),
+                        color: ledColor.withValues(alpha: 0.8),
                         blurRadius: 6,
                         spreadRadius: 1,
                       )

@@ -39,7 +39,6 @@ class UpTsiTelemetryApp extends StatelessWidget {
           primary: Color(0xFFE51A24),
           secondary: Color(0xFF0070F3),
           surface: Color(0xFF121722),
-          background: Color(0xFF0A0D14),
         ),
       ),
       home: const DashboardScreen(),
