@@ -89,6 +89,8 @@ class ObdBluetoothService extends ChangeNotifier {
   int _misfiresCyl2 = 0;
   int _misfiresCyl3 = 0;
   int _misfiresCyl4 = 0;
+  int _misfiresCyl5 = 0;
+  int _misfiresCyl6 = 0;
 
   double get peakHp => _peakHp;
   double get peakTorqueKgfm => _peakTorqueKgfm;
@@ -138,11 +140,15 @@ class ObdBluetoothService extends ChangeNotifier {
     _misfiresCyl2 = 0;
     _misfiresCyl3 = 0;
     _misfiresCyl4 = 0;
+    _misfiresCyl5 = 0;
+    _misfiresCyl6 = 0;
     _data = _data.copyWith(
       misfiresCyl1: 0,
       misfiresCyl2: 0,
       misfiresCyl3: 0,
       misfiresCyl4: 0,
+      misfiresCyl5: 0,
+      misfiresCyl6: 0,
     );
     notifyListeners();
   }
@@ -155,6 +161,8 @@ class ObdBluetoothService extends ChangeNotifier {
       _shiftRpm = 5500;
     } else if (profile.contains('2.0 TSI')) {
       _shiftRpm = 6000;
+    } else if (profile.contains('Sorento') || profile.contains('3.5 V6')) {
+      _shiftRpm = 6200;
     }
     _data = _data.copyWith(vehicleProfile: profile, shiftRpm: _shiftRpm);
     notifyListeners();
@@ -583,6 +591,8 @@ class ObdBluetoothService extends ChangeNotifier {
       misfiresCyl2: _misfiresCyl2,
       misfiresCyl3: _misfiresCyl3,
       misfiresCyl4: _misfiresCyl4,
+      misfiresCyl5: _misfiresCyl5,
+      misfiresCyl6: _misfiresCyl6,
     );
 
     notifyListeners();
@@ -601,12 +611,16 @@ class ObdBluetoothService extends ChangeNotifier {
     required double dtSeconds,
   }) {
     // 1. Motor displacement & Max limits according to profile
-    final double disp = _vehicleProfile.contains('2.0 TSI')
-        ? 1.984
-        : (_vehicleProfile.contains('1.4 TSI') ? 1.395 : 0.999);
-    final double maxHpCap = _vehicleProfile.contains('2.0 TSI')
-        ? 260.0
-        : (_vehicleProfile.contains('1.4 TSI') ? 175.0 : 135.0);
+    final double disp = (_vehicleProfile.contains('Sorento') || _vehicleProfile.contains('3.5 V6'))
+        ? 3.470
+        : (_vehicleProfile.contains('2.0 TSI')
+            ? 1.984
+            : (_vehicleProfile.contains('1.4 TSI') ? 1.395 : 0.999));
+    final double maxHpCap = (_vehicleProfile.contains('Sorento') || _vehicleProfile.contains('3.5 V6'))
+        ? 290.0
+        : (_vehicleProfile.contains('2.0 TSI')
+            ? 260.0
+            : (_vehicleProfile.contains('1.4 TSI') ? 175.0 : 135.0));
 
     // 2. Airflow & Virtual Dyno
     final double absKpa = max(25.0, mapKpa.toDouble());
@@ -653,7 +667,7 @@ class ObdBluetoothService extends ChangeNotifier {
     final double tripMinutes = DateTime.now().difference(_tripStartTime).inSeconds / 60.0;
 
     // 7. Teor de Etanol (Flex)
-    final int ethanol = _vehicleProfile.contains('2.0 TSI') ? 27 : 85;
+    final int ethanol = (_vehicleProfile.contains('2.0 TSI') || _vehicleProfile.contains('Sorento')) ? 27 : 85;
 
     // 8. Força G
     final double accelMs2 = (speed / 3.6) * 0.05;
@@ -831,6 +845,8 @@ class ObdBluetoothService extends ChangeNotifier {
         misfiresCyl2: _misfiresCyl2,
         misfiresCyl3: _misfiresCyl3,
         misfiresCyl4: _misfiresCyl4,
+        misfiresCyl5: _misfiresCyl5,
+        misfiresCyl6: _misfiresCyl6,
       );
 
       notifyListeners();

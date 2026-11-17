@@ -105,14 +105,17 @@ class _HealthDiagnosticsViewState extends State<HealthDiagnosticsView> {
 
   // Monitor de Cilindros e Falhas de Ignição (Misfire Counters)
   Widget _buildCylinderMisfireCard(BuildContext context, ObdBluetoothService obd, dynamic data, {bool compact = false}) {
+    final bool isV6 = obd.vehicleProfile.contains('Sorento') || obd.vehicleProfile.contains('3.5 V6');
     final bool isThreeCyl = obd.vehicleProfile.contains('1.0 TSI');
-    final int cylCount = isThreeCyl ? 3 : 4;
+    final int cylCount = isV6 ? 6 : (isThreeCyl ? 3 : 4);
 
     final misfires = [
       data.misfiresCyl1 as int,
       data.misfiresCyl2 as int,
       data.misfiresCyl3 as int,
       if (!isThreeCyl) data.misfiresCyl4 as int,
+      if (isV6) data.misfiresCyl5 as int,
+      if (isV6) data.misfiresCyl6 as int,
     ];
 
     return Container(
@@ -133,7 +136,9 @@ class _HealthDiagnosticsViewState extends State<HealthDiagnosticsView> {
                   const Icon(Icons.flash_on, color: Color(0xFF00A8FF), size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'MONITOR DE CILINDROS ($cylCount CILINDROS)',
+                    isV6
+                        ? 'MONITOR DE CILINDROS (V6 DUAL BANK)'
+                        : 'MONITOR DE CILINDROS ($cylCount CILINDROS)',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -157,65 +162,126 @@ class _HealthDiagnosticsViewState extends State<HealthDiagnosticsView> {
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Monitora falhas de queima/faísca por cilindro em tempo real para detectar velas ou bobinas gastas.',
-            style: TextStyle(fontSize: 10.5, color: Color(0xFF8B9BB4)),
+          Text(
+            isV6
+                ? 'Monitora queima e falhas de ignição nos 6 cilindros da Kia Sorento 3.5 V6 (Bancos 1 e 2).'
+                : 'Monitora falhas de queima/faísca por cilindro em tempo real para detectar velas ou bobinas gastas.',
+            style: const TextStyle(fontSize: 10.5, color: Color(0xFF8B9BB4)),
           ),
           const SizedBox(height: 12),
 
-          // Cards de cada cilindro
-          Row(
-            children: List.generate(cylCount, (index) {
-              final cylNumber = index + 1;
-              final count = misfires[index];
-              final bool hasFault = count > 0;
+          // Cards de cada cilindro (se V6, exibe em 2 linhas de 3 cilindros)
+          if (isV6) ...[
+            _buildMisfireRow([1, 2, 3], [misfires[0], misfires[1], misfires[2]], label: 'BANCO 1 (CIL 1-3)'),
+            const SizedBox(height: 6),
+            _buildMisfireRow([4, 5, 6], [misfires[3], misfires[4], misfires[5]], label: 'BANCO 2 (CIL 4-6)'),
+          ] else ...[
+            Row(
+              children: List.generate(cylCount, (index) {
+                final cylNumber = index + 1;
+                final count = misfires[index];
+                final bool hasFault = count > 0;
 
-              return Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(right: index < cylCount - 1 ? 6 : 0),
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: hasFault ? const Color(0xFF2D1418) : const Color(0xFF121722),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF242E42),
-                      width: 1.2,
+                return Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(right: index < cylCount - 1 ? 6 : 0),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: hasFault ? const Color(0xFF2D1418) : const Color(0xFF121722),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF242E42),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'CIL $cylNumber',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF8B9BB4),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Icon(
+                          hasFault ? Icons.warning : Icons.check_circle,
+                          size: 18,
+                          color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF00E676),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          hasFault ? '$count falhas' : '0 falhas',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: hasFault ? const Color(0xFFFF5252) : Colors.white70,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'CIL $cylNumber',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF8B9BB4),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Icon(
-                        hasFault ? Icons.warning : Icons.check_circle,
-                        size: 18,
-                        color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF00E676),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        hasFault ? '$count falhas' : '0 falhas',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: hasFault ? const Color(0xFFFF5252) : Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
+                );
+              }),
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildMisfireRow(List<int> cylNumbers, List<int> counts, {required String label}) {
+    return Row(
+      children: List.generate(cylNumbers.length, (i) {
+        final cylNumber = cylNumbers[i];
+        final count = counts[i];
+        final bool hasFault = count > 0;
+
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: i < cylNumbers.length - 1 ? 6 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+            decoration: BoxDecoration(
+              color: hasFault ? const Color(0xFF2D1418) : const Color(0xFF121722),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF242E42),
+                width: 1.2,
+              ),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'CIL $cylNumber',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF8B9BB4),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Icon(
+                  hasFault ? Icons.warning : Icons.check_circle,
+                  size: 16,
+                  color: hasFault ? const Color(0xFFFF5252) : const Color(0xFF00E676),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasFault ? '$count falhas' : '0 falhas',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: hasFault ? const Color(0xFFFF5252) : Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
     );
   }
 

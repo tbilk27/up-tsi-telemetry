@@ -54,6 +54,8 @@ class TelemetryData {
   final int misfiresCyl2;
   final int misfiresCyl3;
   final int misfiresCyl4;
+  final int misfiresCyl5;
+  final int misfiresCyl6;
   final double knockRetard;
 
   // 6. Dynamics / G-Force
@@ -106,6 +108,8 @@ class TelemetryData {
     this.misfiresCyl2 = 0,
     this.misfiresCyl3 = 0,
     this.misfiresCyl4 = 0,
+    this.misfiresCyl5 = 0,
+    this.misfiresCyl6 = 0,
     this.knockRetard = 0.0,
     this.longitudinalGForce = 0.0,
     this.lateralGForce = 0.0,
@@ -157,6 +161,8 @@ class TelemetryData {
     int? misfiresCyl2,
     int? misfiresCyl3,
     int? misfiresCyl4,
+    int? misfiresCyl5,
+    int? misfiresCyl6,
     double? knockRetard,
     double? longitudinalGForce,
     double? lateralGForce,
@@ -207,6 +213,8 @@ class TelemetryData {
       misfiresCyl2: misfiresCyl2 ?? this.misfiresCyl2,
       misfiresCyl3: misfiresCyl3 ?? this.misfiresCyl3,
       misfiresCyl4: misfiresCyl4 ?? this.misfiresCyl4,
+      misfiresCyl5: misfiresCyl5 ?? this.misfiresCyl5,
+      misfiresCyl6: misfiresCyl6 ?? this.misfiresCyl6,
       knockRetard: knockRetard ?? this.knockRetard,
       longitudinalGForce: longitudinalGForce ?? this.longitudinalGForce,
       lateralGForce: lateralGForce ?? this.lateralGForce,

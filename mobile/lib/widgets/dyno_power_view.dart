@@ -94,9 +94,11 @@ class DynoPowerView extends StatelessWidget {
 
   // Cards de Potência (CV) e Torque (kgfm)
   Widget _buildDynoPowerCards(BuildContext context, ObdBluetoothService obd, dynamic data, {bool compact = false}) {
-    final double maxHpScale = obd.vehicleProfile.contains('2.0 TSI')
-        ? 260.0
-        : (obd.vehicleProfile.contains('1.4 TSI') ? 180.0 : 140.0);
+    final double maxHpScale = (obd.vehicleProfile.contains('Sorento') || obd.vehicleProfile.contains('3.5 V6'))
+        ? 320.0
+        : (obd.vehicleProfile.contains('2.0 TSI')
+            ? 260.0
+            : (obd.vehicleProfile.contains('1.4 TSI') ? 180.0 : 140.0));
     final double maxTorqueScale = maxHpScale * 0.22; // ~30.8 para 140 CV (~22 kgfm)
 
     final double hpRatio = (data.estimatedHp / maxHpScale).clamp(0.0, 1.0);

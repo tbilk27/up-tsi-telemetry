@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/obd_bluetooth_service.dart';
@@ -24,9 +25,23 @@ enum FullscreenGauge { none, tachometer, boost, center }
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageController = PageController();
+  final ScrollController _tabScrollController = ScrollController();
   int _currentPage = 0;
   FullscreenGauge _fullscreenGauge = FullscreenGauge.none;
   VoidCallback? _obdListener;
+
+  bool _showLandscapeHeader = false;
+  Timer? _landscapeHeaderTimer;
+  Orientation? _lastOrientation;
+
+  static const List<Map<String, dynamic>> _tabsData = [
+    {'title': 'Painel', 'icon': Icons.speed},
+    {'title': 'Potência', 'icon': Icons.electric_bolt},
+    {'title': 'Consumo', 'icon': Icons.local_gas_station},
+    {'title': 'Monitor', 'icon': Icons.health_and_safety},
+    {'title': 'Drag', 'icon': Icons.timer},
+    {'title': 'Configurações', 'icon': Icons.tune},
+  ];
 
   @override
   void initState() {
@@ -44,12 +59,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _landscapeHeaderTimer?.cancel();
     if (_obdListener != null) {
       final obd = Provider.of<ObdBluetoothService>(context, listen: false);
       obd.removeListener(_obdListener!);
     }
     _pageController.dispose();
+    _tabScrollController.dispose();
     super.dispose();
+  }
+
+  void _triggerLandscapeHeaderTemporaryDisplay() {
+    _landscapeHeaderTimer?.cancel();
+    if (mounted && !_showLandscapeHeader) {
+      setState(() => _showLandscapeHeader = true);
+    }
+    _landscapeHeaderTimer = Timer(const Duration(milliseconds: 3200), () {
+      if (mounted) {
+        setState(() => _showLandscapeHeader = false);
+      }
+    });
+  }
+
+  void _scrollToActiveTab(int index) {
+    if (!_tabScrollController.hasClients) return;
+    const double approxTabWidth = 100.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final targetOffset = (index * approxTabWidth) - (screenWidth / 2) + (approxTabWidth / 2);
+    final maxScroll = _tabScrollController.position.maxScrollExtent;
+    final offset = targetOffset.clamp(0.0, maxScroll);
+    _tabScrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   // Calculate live telemetry alerts
@@ -189,7 +232,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final obd = Provider.of<ObdBluetoothService>(context);
     final data = obd.data;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final currentOrientation = MediaQuery.of(context).orientation;
+    final isLandscape = currentOrientation == Orientation.landscape;
+
+    if (_lastOrientation != null && _lastOrientation != currentOrientation) {
+      if (isLandscape) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _triggerLandscapeHeaderTemporaryDisplay();
+        });
+      }
+    }
+    _lastOrientation = currentOrientation;
 
     if (_fullscreenGauge != FullscreenGauge.none) {
       return _buildFullscreenView(obd, data, isLandscape);
@@ -229,195 +282,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
 
-            // Top Bar with Navigation Tabs (ocultada automaticamente quando o celular estiver na horizontal)
+            // Top Bar em modo vertical (Portrait): 2 linhas com abas em largura total
             if (!isLandscape)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF121722),
-                  border: Border(bottom: BorderSide(color: Color(0xFF242E42))),
-                ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Logo: VW TSI
-                  Row(
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF0F1522),
-                          border: Border.all(color: const Color(0xFF5A739B), width: 1.5),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'VW',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF8EB1E5),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Text(
-                            'T',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          Text(
-                            'SI',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                              color: Color(0xFFE51A24),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              _buildPortraitTopBar(obd, totalIssues),
 
-                  // Swipe Tabs Indicator (6 Abas de Telemetria com rolagem horizontal)
-                  Flexible(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D121C),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF202B3D)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildTabButton(
-                              title: 'Painel',
-                              icon: Icons.speed,
-                              index: 0,
-                              isActive: _currentPage == 0,
-                            ),
-                            _buildTabButton(
-                              title: 'Potência',
-                              icon: Icons.electric_bolt,
-                              index: 1,
-                              isActive: _currentPage == 1,
-                            ),
-                            _buildTabButton(
-                              title: 'Arrancada',
-                              icon: Icons.timer,
-                              index: 2,
-                              isActive: _currentPage == 2,
-                            ),
-                            _buildTabButton(
-                              title: 'Consumo',
-                              icon: Icons.local_gas_station,
-                              index: 3,
-                              isActive: _currentPage == 3,
-                            ),
-                            _buildTabButton(
-                              title: 'Saúde',
-                              icon: Icons.health_and_safety,
-                              index: 4,
-                              isActive: _currentPage == 4,
-                              badgeCount: totalIssues,
-                            ),
-                            _buildTabButton(
-                              title: 'Ajustes',
-                              icon: Icons.tune,
-                              index: 5,
-                              isActive: _currentPage == 5,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  // Actions: Terminal OBD & Bluetooth Status Pill
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Terminal & Logs OBDII',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                        icon: const Icon(Icons.terminal, color: Color(0xFF8B9BB4), size: 18),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ObdTerminalScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const BluetoothConnectScreen(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F131A),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF242E42)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: obd.isConnected
-                                      ? const Color(0xFF00E676)
-                                      : const Color(0xFFFF5252),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                obd.isSimulating
-                                    ? 'MOCK'
-                                    : (obd.isConnected ? 'OBDII ON' : 'CONECTAR'),
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFC0CDE0),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            // Header temporário em modo horizontal (Landscape): Auto-oculta após 3.2s
+            if (isLandscape)
+              _buildLandscapeTemporaryHeader(obd, totalIssues),
 
             // PageView allowing horizontal swipe
             Expanded(
@@ -426,21 +297,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 physics: const BouncingScrollPhysics(),
                 onPageChanged: (page) {
                   setState(() => _currentPage = page);
+                  _scrollToActiveTab(page);
+                  if (isLandscape) {
+                    _triggerLandscapeHeaderTemporaryDisplay();
+                  }
                 },
                 children: [
-                  // PAGE 0: Main Telemetry Dashboard (Gauges, Tacômetro, Boost, Cluster)
+                  // PAGE 0: Painel (Mostradores Principais, Tacômetro, Boost, Cluster)
                   _buildTelemetryDashboardPage(obd, data, isLandscape, isShiftPoint),
 
-                  // PAGE 1: Virtual Dyno, Potência, Torque, Rail & G-Meter
+                  // PAGE 1: Potência (Dinamômetro Virtual, Torque, Rail HPFP & G-Meter)
                   DynoPowerView(isLandscape: isLandscape),
 
-                  // PAGE 2: Drag Race Performance Meter (0-100, 40-100, Splits)
-                  PerformanceMeterView(isLandscape: isLandscape),
-
-                  // PAGE 3: Computador de Bordo, Consumo km/L e L/h, Flex Etanol
+                  // PAGE 2: Consumo (Computador de Bordo, km/L, L/h, Flex Etanol)
                   TripComputerView(isLandscape: isLandscape),
 
-                  // PAGE 4: Monitor de Cilindros, Misfire Counter, Knock & DTCs
+                  // PAGE 3: Monitor (Diagnóstico de Cilindros, Misfire Counter, DTCs, Alertas)
                   HealthDiagnosticsView(
                     isLandscape: isLandscape,
                     liveAlerts: liveAlerts,
@@ -448,7 +320,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onClearDtc: () => _clearErrors(obd),
                   ),
 
-                  // PAGE 5: Configurações, Perfil do Veículo, Shift-light & Ajustes
+                  // PAGE 4: Drag (Performance Meter, Arrancada, Retomada 0-100, Splits)
+                  PerformanceMeterView(isLandscape: isLandscape),
+
+                  // PAGE 5: Configurações (Perfil do Veículo, Shift-light, Boost Peak, Ajustes)
                   _buildSettingsPage(obd, data),
                 ],
               ),
@@ -459,67 +334,441 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Tab button in top bar
+  // Header em modo Vertical (Portrait): Logo e ações no topo; abas em largura total com auto-scroll
+  Widget _buildPortraitTopBar(ObdBluetoothService obd, int totalIssues) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF101522),
+        border: Border(bottom: BorderSide(color: Color(0xFF222C3E))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Linha 1: Logo e Ações (Terminal & Bluetooth)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildVehicleLogo(obd),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Terminal & Logs OBDII',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.terminal, color: Color(0xFF8B9BB4), size: 18),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ObdTerminalScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _buildBluetoothPill(obd),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Linha 2: Barra de Abas Horizontal com Largura Total e Auto-Scroll
+          Container(
+            height: 38,
+            margin: const EdgeInsets.only(bottom: 6),
+            child: SingleChildScrollView(
+              controller: _tabScrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(_tabsData.length, (idx) {
+                  final tab = _tabsData[idx];
+                  return _buildTabButton(
+                    title: tab['title'] as String,
+                    icon: tab['icon'] as IconData,
+                    index: idx,
+                    isActive: _currentPage == idx,
+                    badgeCount: idx == 3 ? totalIssues : 0,
+                  );
+                }),
+              ),
+            ),
+          ),
+
+          // Linha 3: Indicador de Posição (Mini-dots das 6 abas)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_tabsData.length, (idx) {
+                final isActive = _currentPage == idx;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isActive ? 18 : 5,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: isActive ? const Color(0xFF00A8FF) : const Color(0xFF263348),
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF00A8FF).withValues(alpha: 0.6),
+                              blurRadius: 4,
+                            ),
+                          ]
+                        : null,
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Header Temporário em Modo Paisagem (Landscape): exibe temporariamente para orientar o usuário
+  Widget _buildLandscapeTemporaryHeader(ObdBluetoothService obd, int totalIssues) {
+    return AnimatedCrossFade(
+      duration: const Duration(milliseconds: 250),
+      crossFadeState: _showLandscapeHeader ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+      firstChild: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xF2101522),
+          border: const Border(bottom: BorderSide(color: Color(0xFF00A8FF), width: 1.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.6),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Identificador visual do painel atual (Ex: POTÊNCIA • 2/6)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0066FF),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${_currentPage + 1}/6',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  (_tabsData[_currentPage]['title'] as String).toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+
+            // Abas horizontais em versão compacta para troca rápida
+            Flexible(
+              child: SingleChildScrollView(
+                controller: _tabScrollController,
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(_tabsData.length, (idx) {
+                    final tab = _tabsData[idx];
+                    return _buildTabButton(
+                      title: tab['title'] as String,
+                      icon: tab['icon'] as IconData,
+                      index: idx,
+                      isActive: _currentPage == idx,
+                      badgeCount: idx == 3 ? totalIssues : 0,
+                      compact: true,
+                    );
+                  }),
+                ),
+              ),
+            ),
+
+            // Botão para recolher manualmente
+            IconButton(
+              tooltip: 'Recolher',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              icon: const Icon(Icons.keyboard_arrow_up, color: Color(0xFF8B9BB4), size: 20),
+              onPressed: () {
+                setState(() => _showLandscapeHeader = false);
+              },
+            ),
+          ],
+        ),
+      ),
+      secondChild: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _triggerLandscapeHeaderTemporaryDisplay,
+        child: Container(
+          height: 12,
+          width: double.infinity,
+          alignment: Alignment.topCenter,
+          child: Container(
+            width: 48,
+            height: 3,
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4A5B78).withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Logo adaptável do veículo
+  Widget _buildVehicleLogo(ObdBluetoothService obd) {
+    final isKia = obd.vehicleProfile.contains('Sorento') || obd.vehicleProfile.contains('3.5 V6');
+    if (isKia) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFBB162B),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'KIA',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.0,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            '3.5 V6',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+              color: Color(0xFFE2E8F0),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF0F1522),
+            border: Border.all(color: const Color(0xFF5A739B), width: 1.5),
+          ),
+          child: const Center(
+            child: Text(
+              'VW',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF8EB1E5),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 7),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Text(
+              'T',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                color: Color(0xFFE2E8F0),
+              ),
+            ),
+            Text(
+              'SI',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                color: Color(0xFFE51A24),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Pílula de status de conexão Bluetooth
+  Widget _buildBluetoothPill(ObdBluetoothService obd) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const BluetoothConnectScreen(),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F131A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF242E42)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: obd.isConnected
+                    ? const Color(0xFF00E676)
+                    : const Color(0xFFFF5252),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              obd.isSimulating
+                  ? 'MOCK'
+                  : (obd.isConnected ? 'OBDII ON' : 'CONECTAR'),
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFC0CDE0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Botão individual da aba com alto contraste, relevo e auto-scroll
   Widget _buildTabButton({
     required String title,
     required IconData icon,
     required int index,
     required bool isActive,
     int badgeCount = 0,
+    bool compact = false,
   }) {
-    return InkWell(
-      onTap: () {
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF1E283B) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 13,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: InkWell(
+        onTap: () {
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+          );
+          if (_showLandscapeHeader) {
+            _triggerLandscapeHeaderTemporaryDisplay();
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 9 : 12,
+            vertical: compact ? 4 : 6,
+          ),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFF0066FF) : const Color(0xFF131926),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
               color: isActive
-                  ? (index == 4 && badgeCount > 0 ? const Color(0xFFFF5252) : const Color(0xFF00E676))
-                  : const Color(0xFF7387A8),
+                  ? const Color(0xFF00E5FF)
+                  : (index == 3 && badgeCount > 0 ? const Color(0xFFE51A24) : const Color(0xFF222D42)),
+              width: isActive ? 1.5 : 1.0,
             ),
-            const SizedBox(width: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? Colors.white : const Color(0xFF8B9BB4),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF0066FF).withValues(alpha: 0.45),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: compact ? 13 : 15,
+                color: isActive
+                    ? Colors.white
+                    : (index == 3 && badgeCount > 0 ? const Color(0xFFFF5252) : const Color(0xFF7E91AD)),
               ),
-            ),
-            if (badgeCount > 0) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE51A24),
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(width: 5),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: compact ? 10.5 : 11.5,
+                  fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+                  letterSpacing: 0.3,
+                  color: isActive ? Colors.white : const Color(0xFF8B9BB4),
                 ),
-                child: Text(
-                  '$badgeCount',
-                  style: const TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              ),
+              if (badgeCount > 0) ...[
+                const SizedBox(width: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE51A24),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$badgeCount',
+                    style: TextStyle(
+                      fontSize: compact ? 8 : 9,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -817,7 +1066,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icon(Icons.directions_car, color: Color(0xFF00A8FF), size: 22),
                         SizedBox(width: 8),
                         Text(
-                          'PLATAFORMA / VEÍCULO VW TSI',
+                          'PLATAFORMA / VEÍCULO & MOTOR',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -835,7 +1084,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         border: Border.all(color: const Color(0xFF00A8FF)),
                       ),
                       child: const Text(
-                        'EA211 / EA888',
+                        'VW TSI / KIA V6',
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 10,
@@ -860,6 +1109,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildProfileChip(obd, 'VW 1.0 TSI', 'Polo, Virtus, Nivus, T-Cross, Up!'),
                     _buildProfileChip(obd, 'VW 1.4 TSI', 'Golf, Jetta, GTS, Taos'),
                     _buildProfileChip(obd, 'VW 2.0 TSI', 'GTI, GLI, Tiguan'),
+                    _buildProfileChip(obd, 'Kia Sorento 3.5 V6', 'Lambda II DOHC 24V Aspirado'),
                   ],
                 ),
               ],
