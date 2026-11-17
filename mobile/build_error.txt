@@ -1,0 +1,211 @@
+
+Running Gradle task 'assembleRelease'...                        
+Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+lib/screens/dashboard_screen.dart:422:62: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                              color: const Color(0xFF00A8FF).withValues(alpha: 0.6),
+                                                             ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:449:35: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: Colors.black.withValues(alpha: 0.6),
+                                  ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:539:46: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: const Color(0xFF4A5B78).withValues(alpha: 0.5),
+                                             ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:725:54: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                      color: const Color(0xFF0066FF).withValues(alpha: 0.45),
+                                                     ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:993:55: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                            ? const Color(0xFF00E676).withValues(alpha: 0.15)
+                                                      ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:994:55: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                            : const Color(0xFFFF5252).withValues(alpha: 0.15),
+                                                      ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1082:56: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        color: const Color(0xFF00A8FF).withValues(alpha: 0.15),
+                                                       ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1153:56: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        color: const Color(0xFFFFEA00).withValues(alpha: 0.15),
+                                                       ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1180:59: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                    overlayColor: const Color(0xFFFFEA00).withValues(alpha: 0.2),
+                                                          ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1255:56: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        color: const Color(0xFFFF1744).withValues(alpha: 0.15),
+                                                       ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1282:59: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                    overlayColor: const Color(0xFFFF1744).withValues(alpha: 0.2),
+                                                          ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1357:56: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                                                       ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1529:35: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: Colors.black.withValues(alpha: 0.35),
+                                  ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1593:40: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        ? Colors.black.withValues(alpha: 0.08)
+                                       ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1594:51: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        : const Color(0xFFE51A24).withValues(alpha: 0.12),
+                                                  ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1687:35: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: Colors.black.withValues(alpha: 0.4),
+                                  ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1748:40: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        ? Colors.black.withValues(alpha: 0.08)
+                                       ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1749:51: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        : const Color(0xFFE51A24).withValues(alpha: 0.12),
+                                                  ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1821:53: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+    final cardBgColor = isShiftPoint ? Colors.black.withValues(alpha: 0.08) : const Color(0xFF0E131D);
+                                                    ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1825:53: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+    final gearBgColor = isShiftPoint ? Colors.black.withValues(alpha: 0.08) : const Color(0xFFE51A24).withValues(alpha: 0.12);
+                                                    ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:1825:103: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+    final gearBgColor = isShiftPoint ? Colors.black.withValues(alpha: 0.08) : const Color(0xFFE51A24).withValues(alpha: 0.12);
+                                                                                          ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:2031:39: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                  color: Colors.black.withValues(alpha: 0.15),
+                                      ^^^^^^^^^^
+lib/screens/dashboard_screen.dart:2134:54: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                  color: isShiftPoint ? Colors.black.withValues(alpha: 0.1) : const Color(0xFF121722),
+                                                     ^^^^^^^^^^
+lib/widgets/tachometer_gauge.dart:105:41: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+      ..color = const Color(0xFFE51A24).withValues(alpha: 0.4)
+                                        ^^^^^^^^^^
+lib/widgets/boost_gauge.dart:120:41: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+      ..color = const Color(0xFF00A8FF).withValues(alpha: 0.25)
+                                        ^^^^^^^^^^
+lib/widgets/boost_gauge.dart:274:45: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+          ..color = const Color(0xFFFFD600).withValues(alpha: 0.7)
+                                            ^^^^^^^^^^
+lib/widgets/shift_light_bar.dart:66:41: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                        color: ledColor.withValues(alpha: 0.8),
+                                        ^^^^^^^^^^
+lib/widgets/performance_meter_view.dart:200:46: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                                             ^^^^^^^^^^
+lib/widgets/performance_meter_view.dart:206:46: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: const Color(0xFFFFD600).withValues(alpha: 0.12),
+                                             ^^^^^^^^^^
+lib/widgets/performance_meter_view.dart:218:34: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+              color: statusColor.withValues(alpha: 0.14),
+                                 ^^^^^^^^^^
+lib/widgets/performance_meter_view.dart:616:67: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.5)),
+                                                                  ^^^^^^^^^^
+lib/widgets/performance_meter_view.dart:674:61: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                    color: isBest ? const Color(0xFFFFD700).withValues(alpha: 0.6) : const Color(0xFF202A3D),
+                                                            ^^^^^^^^^^
+lib/widgets/dyno_power_view.dart:701:41: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+      ..color = const Color(0xFF00E676).withValues(alpha: 0.3)
+                                        ^^^^^^^^^^
+lib/widgets/trip_computer_view.dart:140:69: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                  border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.4)),
+                                                                    ^^^^^^^^^^
+lib/widgets/health_diagnostics_view.dart:431:67: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.3)),
+                                                                  ^^^^^^^^^^
+lib/widgets/health_diagnostics_view.dart:526:67: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.3)),
+                                                                  ^^^^^^^^^^
+lib/screens/bluetooth_connect_screen.dart:94:55: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                            ? const Color(0xFF00E676).withValues(alpha: 0.6)
+                                                      ^^^^^^^^^^
+lib/screens/bluetooth_connect_screen.dart:239:63: Error: The method 'withValues' isn't defined for the class 'Color'.
+ - 'Color' is from 'dart:ui'.
+Try correcting the name to the name of an existing method, or defining a method named 'withValues'.
+                                    ? const Color(0xFFE51A24).withValues(alpha: 0.5)
+                                                              ^^^^^^^^^^
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildRelease'.
+> Process 'command '/opt/hostedtoolcache/flutter/stable-3.24.5-x64/flutter/bin/flutter'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 30s
+Running Gradle task 'assembleRelease'...                           90.8s
+Gradle task assembleRelease failed with exit code 1
