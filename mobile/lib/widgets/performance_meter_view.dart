@@ -523,7 +523,7 @@ class _PerformanceMeterViewState extends State<PerformanceMeterView> {
 
         const SizedBox(width: 8),
 
-        // Botão Simular Puxada Up! TSI (Demo bancada)
+        // Botão Simular Puxada VW TSI (Demo bancada)
         Expanded(
           flex: 2,
           child: OutlinedButton.icon(

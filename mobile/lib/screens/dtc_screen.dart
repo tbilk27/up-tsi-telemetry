@@ -197,7 +197,7 @@ class _DtcScreenState extends State<DtcScreen> {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                'A ECU Bosch MED17 do Up! TSI reportou zero DTCs.',
+                                'A ECU dos veículos da linha VW TSI reportou zero DTCs.',
                                 style: TextStyle(
                                   color: Color(0xFF8B9BB4),
                                   fontSize: 12,

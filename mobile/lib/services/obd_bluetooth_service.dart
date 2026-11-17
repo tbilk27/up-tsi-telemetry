@@ -59,6 +59,7 @@ class ObdBluetoothService extends ChangeNotifier {
   DateTime _dynamicPeakTimestamp = DateTime.now();
   int _shiftRpm = 5200;
   int _peakHoldSeconds = 10; // Default 10 seconds (configurable)
+  String _vehicleProfile = 'VW TSI Universal';
 
   Completer<String>? _currentCompleter;
   final StringBuffer _rxAccumulator = StringBuffer();
@@ -75,6 +76,7 @@ class ObdBluetoothService extends ChangeNotifier {
   List<ObdLogEntry> get logs => List.unmodifiable(_logs);
   int get shiftRpm => _shiftRpm;
   int get peakHoldSeconds => _peakHoldSeconds;
+  String get vehicleProfile => _vehicleProfile;
   double get dynamicPeakBoost => _dynamicPeakBoost;
 
   void setShiftRpm(int rpm) {
@@ -85,6 +87,19 @@ class ObdBluetoothService extends ChangeNotifier {
 
   void setPeakHoldSeconds(int seconds) {
     _peakHoldSeconds = seconds;
+    notifyListeners();
+  }
+
+  void setVehicleProfile(String profile) {
+    _vehicleProfile = profile;
+    if (profile.contains('1.0 TSI')) {
+      _shiftRpm = 5200;
+    } else if (profile.contains('1.4 TSI')) {
+      _shiftRpm = 5500;
+    } else if (profile.contains('2.0 TSI')) {
+      _shiftRpm = 6000;
+    }
+    _data = _data.copyWith(vehicleProfile: profile, shiftRpm: _shiftRpm);
     notifyListeners();
   }
 
@@ -132,7 +147,7 @@ class ObdBluetoothService extends ChangeNotifier {
 
   String exportLogsAsText() {
     final sb = StringBuffer();
-    sb.writeln('=== UP! TSI TELEMETRY OBDII RAW LOG ===');
+    sb.writeln('=== VW TSI TELEMETRY OBDII RAW LOG ===');
     sb.writeln('Data: ${DateTime.now().toIso8601String()}');
     sb.writeln('Dispositivo: ${_selectedDevice?.name ?? "N/A"} (${_selectedDevice?.address ?? "N/A"})');
     sb.writeln('Protocolo: ${_data.protocol}');
@@ -234,7 +249,7 @@ class ObdBluetoothService extends ChangeNotifier {
       );
 
       _status = BluetoothStateStatus.connected;
-      _statusMessage = 'Conectado ao Up! TSI';
+      _statusMessage = 'Conectado à ECU VW TSI';
       notifyListeners();
 
       _startPollingLoop();
@@ -480,9 +495,7 @@ class ObdBluetoothService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Gear estimation for Up! TSI (MQ200 5-speed manual)
-  // Relações Up! TSI: 1ª 3.769, 2ª 2.095, 3ª 1.281, 4ª 0.927, 5ª 0.740, Dif 3.625
-  // Relações teóricas RPM / km/h: 1ª ~120, 2ª ~66.8, 3ª ~40.8, 4ª ~29.6, 5ª ~23.6
+  // Estimativa universal de marchas para transmissões manuais e automáticas VW TSI (5 e 6 marchas / DSG)
   String _estimateGear(int speed, int rpm) {
     if (rpm < 550 || speed < 3) return 'N';
     final ratio = rpm / speed;
@@ -490,7 +503,8 @@ class ObdBluetoothService extends ChangeNotifier {
     if (ratio > 53) return '2';
     if (ratio > 35) return '3';
     if (ratio > 26.5) return '4';
-    if (ratio > 17) return '5';
+    if (ratio > 20.0) return '5';
+    if (ratio > 14.0) return '6';
     return 'N';
   }
 

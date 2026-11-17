@@ -415,7 +415,7 @@ class PerformanceMeterService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Simulação realista de arrancada Up! TSI para demonstração e testes rápidos
+  // Simulação realista de arrancada VW TSI para demonstração e testes rápidos
   void simulateRun() {
     _simulationTimer?.cancel();
     arm();
@@ -426,7 +426,7 @@ class PerformanceMeterService extends ChangeNotifier {
     final targetEnd = activeVEnd.toDouble();
     final targetStart = activeVStart.toDouble();
 
-    // Curva de torque e potência típica do Up! TSI (105 cv / 16.8 kgfm)
+    // Curva de torque e potência típica da linha VW TSI (1.0/1.4 TSI)
     // 0-100 km/h em aprox. 8.4s
     double currentSimSpeed = targetStart;
     double currentSimBoost = 0.0;
@@ -436,7 +436,7 @@ class PerformanceMeterService extends ChangeNotifier {
       step++;
       final elapsed = (step * intervalMs) / 1000.0;
 
-      // Simulação de física Up! TSI
+      // Simulação de física VW TSI
       if (elapsed < 0.2) {
         // Largada / spool
         currentSimBoost = min(1.35, currentSimBoost + 0.35);

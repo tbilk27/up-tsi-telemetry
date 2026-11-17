@@ -241,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Logo
+                  // Logo: VW TSI
                   Row(
                     children: [
                       Container(
@@ -249,6 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         height: 26,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
+                          color: const Color(0xFF0F1522),
                           border: Border.all(color: const Color(0xFF5A739B), width: 1.5),
                         ),
                         child: const Center(
@@ -257,20 +258,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF7B98C5),
+                              color: Color(0xFF8EB1E5),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'up!',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
-                      ),
-                      const SizedBox(width: 3),
-                      const Text(
-                        'TSI',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFFE51A24)),
+                      const SizedBox(width: 7),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            'T',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          Text(
+                            'SI',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: Color(0xFFE51A24),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -788,6 +803,83 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 20),
 
+          // Card: Perfil do Veículo (Plataforma VW TSI)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E131D),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF202B3D)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.directions_car, color: Color(0xFF00A8FF), size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'PLATAFORMA / VEÍCULO VW TSI',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00A8FF).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF00A8FF)),
+                      ),
+                      child: const Text(
+                        'EA211 / EA888',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF00A8FF),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Compatível com toda a linha TSI (Golf, Jetta, Polo, Virtus, Nivus, T-Cross, Taos, Up!). Calibra automaticamente as relações e o ponto de troca ideal.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF8B9BB4), height: 1.3),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildProfileChip(obd, 'VW TSI Universal', 'Todos os Modelos'),
+                    _buildProfileChip(obd, 'VW 1.0 TSI', 'Polo, Virtus, Nivus, T-Cross, Up!'),
+                    _buildProfileChip(obd, 'VW 1.4 TSI', 'Golf, Jetta, GTS, Taos'),
+                    _buildProfileChip(obd, 'VW 2.0 TSI', 'GTI, GLI, Tiguan'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
           // Card de Configuração do Shift-Light RPM
           Container(
             padding: const EdgeInsets.all(16),
@@ -848,7 +940,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Ajuste em passos de 100 RPM quando o alerta amarelo e os LEDs disparam. Faixa ideal de rendimento do Up! TSI: ~5.200 RPM.',
+                  'Ajuste em passos de 100 RPM quando o alerta amarelo e os LEDs disparam. Faixa ideal de rendimento da linha VW TSI: 5.200 a 5.800 RPM.',
                   style: TextStyle(fontSize: 11, color: Color(0xFF8B9BB4), height: 1.3),
                 ),
                 const SizedBox(height: 12),
@@ -885,7 +977,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: const [
                       Text('4.000 RPM', style: TextStyle(fontSize: 10, color: Color(0xFF677B99))),
                       Text(
-                        '5.200 (Recomendado TSI)',
+                        '5.200 - 5.500 (Recomendado TSI)',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -1911,5 +2003,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: _buildCenterCluster(data, isFullscreen: true, isShiftPoint: isShiftPoint),
       );
     }
+  }
+
+  Widget _buildProfileChip(ObdBluetoothService obd, String profileKey, String subtitle) {
+    final isSelected = obd.vehicleProfile.contains(profileKey) ||
+        (profileKey == 'VW TSI Universal' && obd.vehicleProfile == 'VW TSI Universal');
+
+    return InkWell(
+      onTap: () => obd.setVehicleProfile(profileKey),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF162B45) : const Color(0xFF141A26),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF00A8FF) : const Color(0xFF263248),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  size: 13,
+                  color: isSelected ? const Color(0xFF00A8FF) : const Color(0xFF677B99),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  profileKey,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                    color: isSelected ? Colors.white : const Color(0xFFC0CDE0),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9.5,
+                color: isSelected ? const Color(0xFF8EB1E5) : const Color(0xFF677B99),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

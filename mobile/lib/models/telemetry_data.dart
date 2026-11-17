@@ -20,6 +20,7 @@ class TelemetryData {
   final String gear;
   final String vin;
   final String protocol;
+  final String vehicleProfile;
   final List<String> dtcs;
 
   const TelemetryData({
@@ -42,8 +43,9 @@ class TelemetryData {
     this.ltft = 0.0,
     this.voltage = 0.0,
     this.gear = 'N',
-    this.vin = '9BWAH4124HT516995',
+    this.vin = '3VW4T7AU9KM516995',
     this.protocol = 'CAN 11/500',
+    this.vehicleProfile = 'VW TSI Universal',
     this.dtcs = const [],
   });
 
@@ -69,6 +71,7 @@ class TelemetryData {
     String? gear,
     String? vin,
     String? protocol,
+    String? vehicleProfile,
     List<String>? dtcs,
   }) {
     return TelemetryData(
@@ -93,6 +96,7 @@ class TelemetryData {
       gear: gear ?? this.gear,
       vin: vin ?? this.vin,
       protocol: protocol ?? this.protocol,
+      vehicleProfile: vehicleProfile ?? this.vehicleProfile,
       dtcs: dtcs ?? this.dtcs,
     );
   }
