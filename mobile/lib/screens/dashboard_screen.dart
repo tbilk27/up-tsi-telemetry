@@ -7,6 +7,9 @@ import '../widgets/boost_gauge.dart';
 import '../widgets/shift_light_bar.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/performance_meter_view.dart';
+import '../widgets/dyno_power_view.dart';
+import '../widgets/trip_computer_view.dart';
+import '../widgets/health_diagnostics_view.dart';
 import 'bluetooth_connect_screen.dart';
 import 'obd_terminal_screen.dart';
 
@@ -22,7 +25,6 @@ enum FullscreenGauge { none, tachometer, boost, center }
 class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  bool _isScanning = false;
   FullscreenGauge _fullscreenGauge = FullscreenGauge.none;
   VoidCallback? _obdListener;
 
@@ -115,7 +117,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _scanDtcs(ObdBluetoothService obd) async {
-    setState(() => _isScanning = true);
     try {
       await obd.scanDTCs();
     } catch (e) {
@@ -127,8 +128,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isScanning = false);
     }
   }
 
@@ -290,39 +289,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
 
-                  // Swipe Tabs Indicator (Telemetria vs Arrancada vs Ajustes)
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D121C),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF202B3D)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildTabButton(
-                          title: 'Painel',
-                          icon: Icons.speed,
-                          index: 0,
-                          isActive: _currentPage == 0,
+                  // Swipe Tabs Indicator (6 Abas de Telemetria com rolagem horizontal)
+                  Flexible(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D121C),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF202B3D)),
                         ),
-                        _buildTabButton(
-                          title: 'Arrancada',
-                          icon: Icons.timer,
-                          index: 1,
-                          isActive: _currentPage == 1,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildTabButton(
+                              title: 'Painel',
+                              icon: Icons.speed,
+                              index: 0,
+                              isActive: _currentPage == 0,
+                            ),
+                            _buildTabButton(
+                              title: 'Potência',
+                              icon: Icons.electric_bolt,
+                              index: 1,
+                              isActive: _currentPage == 1,
+                            ),
+                            _buildTabButton(
+                              title: 'Arrancada',
+                              icon: Icons.timer,
+                              index: 2,
+                              isActive: _currentPage == 2,
+                            ),
+                            _buildTabButton(
+                              title: 'Consumo',
+                              icon: Icons.local_gas_station,
+                              index: 3,
+                              isActive: _currentPage == 3,
+                            ),
+                            _buildTabButton(
+                              title: 'Saúde',
+                              icon: Icons.health_and_safety,
+                              index: 4,
+                              isActive: _currentPage == 4,
+                              badgeCount: totalIssues,
+                            ),
+                            _buildTabButton(
+                              title: 'Ajustes',
+                              icon: Icons.tune,
+                              index: 5,
+                              isActive: _currentPage == 5,
+                            ),
+                          ],
                         ),
-                        _buildTabButton(
-                          title: 'Ajustes',
-                          icon: Icons.tune,
-                          index: 2,
-                          isActive: _currentPage == 2,
-                          badgeCount: totalIssues,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
+
+                  const SizedBox(width: 6),
 
                   // Actions: Terminal OBD & Bluetooth Status Pill
                   Row(
@@ -403,14 +428,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   setState(() => _currentPage = page);
                 },
                 children: [
-                  // PAGE 0: Main Telemetry Dashboard
+                  // PAGE 0: Main Telemetry Dashboard (Gauges, Tacômetro, Boost, Cluster)
                   _buildTelemetryDashboardPage(obd, data, isLandscape, isShiftPoint),
 
-                  // PAGE 1: Drag Race Performance Meter
+                  // PAGE 1: Virtual Dyno, Potência, Torque, Rail & G-Meter
+                  DynoPowerView(isLandscape: isLandscape),
+
+                  // PAGE 2: Drag Race Performance Meter (0-100, 40-100, Splits)
                   PerformanceMeterView(isLandscape: isLandscape),
 
-                  // PAGE 2: Alerts, DTC Errors & Settings (Shift-light & Peak Hold)
-                  _buildAlertsAndErrorsPage(obd, data, liveAlerts),
+                  // PAGE 3: Computador de Bordo, Consumo km/L e L/h, Flex Etanol
+                  TripComputerView(isLandscape: isLandscape),
+
+                  // PAGE 4: Monitor de Cilindros, Misfire Counter, Knock & DTCs
+                  HealthDiagnosticsView(
+                    isLandscape: isLandscape,
+                    liveAlerts: liveAlerts,
+                    onScanDtc: () => _scanDtcs(obd),
+                    onClearDtc: () => _clearErrors(obd),
+                  ),
+
+                  // PAGE 5: Configurações, Perfil do Veículo, Shift-light & Ajustes
+                  _buildSettingsPage(obd, data),
                 ],
               ),
             ),
@@ -438,25 +477,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFF1E283B) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 14,
+              size: 13,
               color: isActive
-                  ? (index == 2 && badgeCount > 0 ? const Color(0xFFFF5252) : const Color(0xFF00E676))
+                  ? (index == 4 && badgeCount > 0 ? const Color(0xFFFF5252) : const Color(0xFF00E676))
                   : const Color(0xFF7387A8),
             ),
             const SizedBox(width: 4),
             Text(
               title,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                 color: isActive ? Colors.white : const Color(0xFF8B9BB4),
               ),
@@ -467,12 +507,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE51A24),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '$badgeCount',
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 8.5,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -670,12 +710,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // =========================================================================
-  // PAGE 1: Alerts, Messages & DTC Errors Page
+  // PAGE 5: Settings & Platform Configuration Page
   // =========================================================================
-  Widget _buildAlertsAndErrorsPage(
+  Widget _buildSettingsPage(
     ObdBluetoothService obd,
     dynamic data,
-    List<Map<String, dynamic>> liveAlerts,
   ) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -683,44 +722,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Status Card
+          // Header Card: Status do Cockpit e ECU
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFF181F2E),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF242E42)),
+              color: const Color(0xFF141A26),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF243248)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      data.dtcs.isNotEmpty
-                          ? Icons.warning_rounded
-                          : Icons.check_circle_rounded,
-                      size: 28,
-                      color: data.dtcs.isNotEmpty
-                          ? const Color(0xFFFF5252)
-                          : const Color(0xFF00E676),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: obd.isConnected
+                            ? const Color(0xFF00E676).withValues(alpha: 0.15)
+                            : const Color(0xFFFF5252).withValues(alpha: 0.15),
+                        border: Border.all(
+                          color: obd.isConnected ? const Color(0xFF00E676) : const Color(0xFFFF5252),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          obd.isConnected ? Icons.check : Icons.bluetooth_disabled,
+                          size: 18,
+                          color: obd.isConnected ? const Color(0xFF00E676) : const Color(0xFFFF5252),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          data.dtcs.isNotEmpty
-                              ? '${data.dtcs.length} Falha(s) na Injeção'
-                              : 'Luz da Injeção (MIL): Apagada',
+                          obd.statusMessage,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
                         Text(
-                          'ECU: Bosch MED17 • Plataforma PQ12',
+                          'Perfil Ativo: ${obd.vehicleProfile}',
                           style: const TextStyle(fontSize: 11, color: Color(0xFF8B9BB4)),
                         ),
                       ],
@@ -749,74 +798,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 16),
 
-          // Action Buttons: Scan & Clear
-          Row(
-            children: [
-              // Scan Button
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0070F3),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  icon: _isScanning
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.refresh, size: 18),
-                  label: Text(_isScanning ? 'Escanenado...' : 'Escanear Falhas'),
-                  onPressed: _isScanning ? null : () => _scanDtcs(obd),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Clear DTCs Button
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE51A24),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  icon: const Icon(Icons.delete_forever, size: 18),
-                  label: const Text(
-                    'Apagar Erros (MIL)',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () => _clearErrors(obd),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Card: Perfil do Veículo (Plataforma VW TSI)
+          // 1. Card: Perfil do Veículo (Plataforma VW TSI)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: const Color(0xFF0E131D),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFF202B3D)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -880,23 +868,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 14),
 
-          // Card de Configuração do Shift-Light RPM
+          // 2. Card de Configuração do Shift-Light RPM
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF141A28),
+              color: const Color(0xFF0E131D),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: const Color(0xFFFFEA00).withValues(alpha: 0.35),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              border: Border.all(color: const Color(0xFF202B3D)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -963,11 +941,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     value: obd.shiftRpm.toDouble().clamp(4000.0, 6500.0),
                     min: 4000.0,
                     max: 6500.0,
-                    divisions: 25, // 25 divisões = passos de exatamente 100 RPM
+                    divisions: 25,
                     label: '${obd.shiftRpm} RPM',
-                    onChanged: (newVal) {
-                      obd.setShiftRpm(newVal.round());
-                    },
+                    onChanged: (newVal) => obd.setShiftRpm(newVal.round()),
                   ),
                 ),
                 Padding(
@@ -994,7 +970,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 14),
 
-          // Card: Retenção de Pico de Pressão de Turbo (Peak Hold)
+          // 3. Card: Retenção de Pico de Pressão de Turbo (Peak Hold)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1067,11 +1043,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     value: obd.peakHoldSeconds.toDouble().clamp(3.0, 60.0),
                     min: 3.0,
                     max: 60.0,
-                    divisions: 57, // passos de 1 em 1 segundo
+                    divisions: 57,
                     label: '${obd.peakHoldSeconds}s',
-                    onChanged: (newVal) {
-                      obd.setPeakHoldSeconds(newVal.round());
-                    },
+                    onChanged: (newVal) => obd.setPeakHoldSeconds(newVal.round()),
                   ),
                 ),
                 Padding(
@@ -1096,194 +1070,170 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 14),
 
-          // Section 1: Live Telemetry Alerts
-          const Text(
-            'ALERTAS EM TEMPO REAL (SENSORES):',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: Color(0xFF8B9BB4),
+          // 4. Card: Preço do Combustível (para cálculo de custos em R$)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E131D),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF202B3D)),
             ),
-          ),
-          const SizedBox(height: 8),
-
-          if (liveAlerts.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0D1E16),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.check_circle_outline, color: Color(0xFF00E676), size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Todos os sensores operando dentro das faixas normais.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF88D8B0)),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            ...liveAlerts.map((alert) {
-              final isCritical = alert['severity'] == 'critical';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isCritical ? const Color(0xFF2D1012) : const Color(0xFF281E0C),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isCritical ? const Color(0xFFE51A24) : const Color(0xFFFFD600),
-                  ),
-                ),
-                child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(
-                      alert['icon'] as IconData,
-                      color: isCritical ? const Color(0xFFFF4D58) : const Color(0xFFFFD600),
-                      size: 22,
+                    Row(
+                      children: const [
+                        Icon(Icons.local_gas_station, color: Color(0xFF00E676), size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'PREÇO DO COMBUSTÍVEL',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            alert['title'],
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: isCritical ? const Color(0xFFFF6B72) : const Color(0xFFFFE57F),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            alert['desc'],
-                            style: const TextStyle(fontSize: 11, color: Color(0xFFC0CDE0)),
-                          ),
-                        ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF00E676)),
+                      ),
+                      child: Text(
+                        'R\$ ${obd.fuelPricePerLiter.toStringAsFixed(2)} / L',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF00E676),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              );
-            }).toList(),
-
-          const SizedBox(height: 22),
-
-          // Section 2: Active DTC Codes
-          const Text(
-            'CÓDIGOS DE FALHA DA INJEÇÃO (DTCs):',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: Color(0xFF8B9BB4),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          if (data.dtcs.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF121722),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF242E42)),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.verified, color: Color(0xFF00E676), size: 28),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Nenhuma falha ativa registrada',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'A central não reportou códigos de erro (Resposta 43 00).',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF8B9BB4)),
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Utilizado pelo computador de bordo para calcular o custo total da viagem em R\$ em tempo real.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF8B9BB4)),
+                ),
+                const SizedBox(height: 10),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFF00E676),
+                    inactiveTrackColor: const Color(0xFF263248),
+                    thumbColor: const Color(0xFF00E676),
+                    valueIndicatorColor: const Color(0xFF0D121C),
                   ),
-                ],
-              ),
-            )
-          else
-            ...data.dtcs.map((code) {
-              final desc = ObdBluetoothService.tsiDtcDatabase[code] ??
-                  'Código específico do fabricante / plataforma VAG';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1417),
-                  borderRadius: BorderRadius.circular(10),
-                  border: const Border(
-                    left: BorderSide(color: Color(0xFFE51A24), width: 4),
+                  child: Slider(
+                    value: obd.fuelPricePerLiter.clamp(3.50, 8.50),
+                    min: 3.50,
+                    max: 8.50,
+                    divisions: 50,
+                    label: 'R\$ ${obd.fuelPricePerLiter.toStringAsFixed(2)}',
+                    onChanged: (newVal) => obd.setFuelPrice(double.parse(newVal.toStringAsFixed(2))),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          code,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFFF5252),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A0B0D),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFF701B20)),
-                          ),
-                          child: const Text(
-                            'CONFIRMADO',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFF4D58),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // 5. Card: Ações Rápidas de Reset
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E131D),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF202B3D)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.restart_alt, color: Color(0xFFFF9100), size: 20),
+                    SizedBox(width: 8),
                     Text(
-                      desc,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFFC0CDE0)),
+                      'AÇÕES RÁPIDAS DE TELEMETRIA',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.1,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),
-              );
-            }).toList(),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          obd.resetPowerPeaks();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Picos de Potência e Torque zerados!')),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFFEA00),
+                          side: const BorderSide(color: Color(0xFF2B3A52)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        child: const Text('Zerar Picos CV', style: TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          obd.resetTrip();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Computador de bordo e viagem zerados!')),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF00E676),
+                          side: const BorderSide(color: Color(0xFF2B3A52)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        child: const Text('Zerar Viagem', style: TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          obd.clearMisfires();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Contadores de falhas zerados!')),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF00A8FF),
+                          side: const BorderSide(color: Color(0xFF2B3A52)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        child: const Text('Zerar Misfires', style: TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
         ],
       ),
     );

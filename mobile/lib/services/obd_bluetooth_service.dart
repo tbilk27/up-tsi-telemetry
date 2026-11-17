@@ -79,6 +79,23 @@ class ObdBluetoothService extends ChangeNotifier {
   String get vehicleProfile => _vehicleProfile;
   double get dynamicPeakBoost => _dynamicPeakBoost;
 
+  double _peakHp = 0.0;
+  double _peakTorqueKgfm = 0.0;
+  double _totalFuelConsumedLiters = 0.0;
+  double _tripDistanceKm = 0.0;
+  DateTime _tripStartTime = DateTime.now();
+  double _fuelPricePerLiter = 5.89;
+  int _misfiresCyl1 = 0;
+  int _misfiresCyl2 = 0;
+  int _misfiresCyl3 = 0;
+  int _misfiresCyl4 = 0;
+
+  double get peakHp => _peakHp;
+  double get peakTorqueKgfm => _peakTorqueKgfm;
+  double get totalFuelConsumedLiters => _totalFuelConsumedLiters;
+  double get tripDistanceKm => _tripDistanceKm;
+  double get fuelPricePerLiter => _fuelPricePerLiter;
+
   void setShiftRpm(int rpm) {
     _shiftRpm = rpm;
     _data = _data.copyWith(shiftRpm: rpm);
@@ -87,6 +104,46 @@ class ObdBluetoothService extends ChangeNotifier {
 
   void setPeakHoldSeconds(int seconds) {
     _peakHoldSeconds = seconds;
+    notifyListeners();
+  }
+
+  void setFuelPrice(double price) {
+    _fuelPricePerLiter = price;
+    _data = _data.copyWith(fuelPricePerLiter: price);
+    notifyListeners();
+  }
+
+  void resetTrip() {
+    _tripDistanceKm = 0.0;
+    _totalFuelConsumedLiters = 0.0;
+    _tripStartTime = DateTime.now();
+    _data = _data.copyWith(
+      tripDistanceKm: 0.0,
+      totalFuelConsumedLiters: 0.0,
+      tripDurationMinutes: 0.0,
+      avgFuelConsumptionKml: 0.0,
+    );
+    notifyListeners();
+  }
+
+  void resetPowerPeaks() {
+    _peakHp = 0.0;
+    _peakTorqueKgfm = 0.0;
+    _data = _data.copyWith(peakHp: 0.0, peakTorqueKgfm: 0.0);
+    notifyListeners();
+  }
+
+  void clearMisfires() {
+    _misfiresCyl1 = 0;
+    _misfiresCyl2 = 0;
+    _misfiresCyl3 = 0;
+    _misfiresCyl4 = 0;
+    _data = _data.copyWith(
+      misfiresCyl1: 0,
+      misfiresCyl2: 0,
+      misfiresCyl3: 0,
+      misfiresCyl4: 0,
+    );
     notifyListeners();
   }
 
@@ -472,6 +529,19 @@ class ObdBluetoothService extends ChangeNotifier {
 
     _updateDynamicPeak(boostBar);
 
+    final adv = _computeAdvancedMetrics(
+      speed: speed,
+      rpm: rpm,
+      mapKpa: mapKpa,
+      boostBar: boostBar,
+      load: load,
+      tps: tps,
+      timing: timing,
+      coolant: coolant,
+      iat: iat,
+      dtSeconds: 0.1,
+    );
+
     _data = _data.copyWith(
       rpm: rpm,
       speed: speed,
@@ -490,9 +560,127 @@ class ObdBluetoothService extends ChangeNotifier {
       ltft: ltft,
       voltage: voltage,
       gear: _estimateGear(speed, rpm),
+      estimatedHp: adv['hp'],
+      estimatedTorqueNm: adv['torqueNm'],
+      estimatedTorqueKgfm: adv['torqueKgfm'],
+      peakHp: adv['peakHp'],
+      peakTorqueKgfm: adv['peakTorqueKgfm'],
+      fuelRailPressureBar: adv['railBar'],
+      lambda: adv['lambda'],
+      afr: adv['afr'],
+      oilTemperature: adv['oilTemp'],
+      egt: adv['egt'],
+      fuelConsumptionLh: adv['fuelLh'],
+      fuelConsumptionKml: adv['fuelKml'],
+      avgFuelConsumptionKml: adv['avgKml'],
+      totalFuelConsumedLiters: adv['totalFuel'],
+      tripDistanceKm: adv['tripKm'],
+      tripDurationMinutes: adv['tripMinutes'],
+      ethanolPercent: adv['ethanol'],
+      longitudinalGForce: adv['gLong'],
+      lateralGForce: adv['gLat'],
+      misfiresCyl1: _misfiresCyl1,
+      misfiresCyl2: _misfiresCyl2,
+      misfiresCyl3: _misfiresCyl3,
+      misfiresCyl4: _misfiresCyl4,
     );
 
     notifyListeners();
+  }
+
+  Map<String, dynamic> _computeAdvancedMetrics({
+    required int speed,
+    required int rpm,
+    required int mapKpa,
+    required double boostBar,
+    required int load,
+    required int tps,
+    required double timing,
+    required int coolant,
+    required int iat,
+    required double dtSeconds,
+  }) {
+    // 1. Motor displacement & Max limits according to profile
+    final double disp = _vehicleProfile.contains('2.0 TSI')
+        ? 1.984
+        : (_vehicleProfile.contains('1.4 TSI') ? 1.395 : 0.999);
+    final double maxHpCap = _vehicleProfile.contains('2.0 TSI')
+        ? 260.0
+        : (_vehicleProfile.contains('1.4 TSI') ? 175.0 : 135.0);
+
+    // 2. Airflow & Virtual Dyno
+    final double absKpa = max(25.0, mapKpa.toDouble());
+    final double ve = (0.82 + (boostBar > 0 ? boostBar * 0.32 : 0.0)).clamp(0.65, 1.40);
+    final double airGramsPerSec = (absKpa * 1000.0 * (rpm / 120.0) * (disp * 0.001) * ve) /
+        (287.05 * (max(10, iat) + 273.15)) * 1000.0;
+
+    // Potência instantânea (CV)
+    final double hp = rpm > 550
+        ? ((airGramsPerSec / 0.81) * (1.0 + (timing > 10 ? (timing - 10) * 0.015 : 0.0))).clamp(0.0, maxHpCap)
+        : 0.0;
+    _peakHp = max(_peakHp, hp);
+
+    // Torque instantâneo (kgfm e Nm)
+    final double torqueKgfm = (rpm > 550 && hp > 0)
+        ? ((hp * 716.2) / rpm).clamp(0.0, maxHpCap * 0.22)
+        : 0.0;
+    final double torqueNm = torqueKgfm * 9.80665;
+    _peakTorqueKgfm = max(_peakTorqueKgfm, torqueKgfm);
+
+    // 3. High Pressure Rail (HPFP 40 a 200 bar)
+    final double railBar = (45.0 + (load * 1.15) + (boostBar > 0 ? boostBar * 45.0 : 0.0)).clamp(40.0, 210.0);
+
+    // 4. Sonda Lambda & AFR
+    final double lambda = (tps < 3 && rpm > 1700)
+        ? 1.25 // Cut-off freio motor
+        : (load > 80 ? (0.83 + sin(rpm * 0.001) * 0.02) : (1.00 + sin(rpm * 0.002) * 0.01));
+    final double afr = lambda * 14.7;
+
+    // 5. Temperaturas (Óleo e EGT)
+    final int oilTemp = coolant > 0 ? (coolant + 4).clamp(70, 125) : 92;
+    final int egt = (360 + (load * 3.5) + (boostBar > 0 ? boostBar * 190.0 : 0.0)).round().clamp(350, 940);
+
+    // 6. Consumo de Combustível (km/L & L/h)
+    final double fuelLh = (airGramsPerSec * 3600.0) / (afr * 745.0);
+    final double fuelKml = speed > 2 ? (speed / max(0.2, fuelLh)).clamp(0.0, 35.0) : 0.0;
+
+    // Integração da Viagem (Trip)
+    _tripDistanceKm += (speed / 3600.0) * dtSeconds;
+    _totalFuelConsumedLiters += (fuelLh / 3600.0) * dtSeconds;
+    final double avgKml = _totalFuelConsumedLiters > 0.005
+        ? (_tripDistanceKm / _totalFuelConsumedLiters).clamp(0.0, 32.0)
+        : 0.0;
+    final double tripMinutes = DateTime.now().difference(_tripStartTime).inSeconds / 60.0;
+
+    // 7. Teor de Etanol (Flex)
+    final int ethanol = _vehicleProfile.contains('2.0 TSI') ? 27 : 85;
+
+    // 8. Força G
+    final double accelMs2 = (speed / 3.6) * 0.05;
+    final double gLong = (accelMs2 / 9.81).clamp(-1.2, 1.2);
+    final double gLat = (sin(speed * 0.05) * 0.25).clamp(-1.2, 1.2);
+
+    return {
+      'hp': double.parse(hp.toStringAsFixed(1)),
+      'torqueNm': double.parse(torqueNm.toStringAsFixed(1)),
+      'torqueKgfm': double.parse(torqueKgfm.toStringAsFixed(1)),
+      'peakHp': double.parse(_peakHp.toStringAsFixed(1)),
+      'peakTorqueKgfm': double.parse(_peakTorqueKgfm.toStringAsFixed(1)),
+      'railBar': double.parse(railBar.toStringAsFixed(1)),
+      'lambda': double.parse(lambda.toStringAsFixed(2)),
+      'afr': double.parse(afr.toStringAsFixed(1)),
+      'oilTemp': oilTemp,
+      'egt': egt,
+      'fuelLh': double.parse(fuelLh.toStringAsFixed(1)),
+      'fuelKml': double.parse(fuelKml.toStringAsFixed(1)),
+      'avgKml': double.parse(avgKml.toStringAsFixed(1)),
+      'totalFuel': double.parse(_totalFuelConsumedLiters.toStringAsFixed(2)),
+      'tripKm': double.parse(_tripDistanceKm.toStringAsFixed(2)),
+      'tripMinutes': double.parse(tripMinutes.toStringAsFixed(1)),
+      'ethanol': ethanol,
+      'gLong': double.parse(gLong.toStringAsFixed(2)),
+      'gLat': double.parse(gLat.toStringAsFixed(2)),
+    };
   }
 
   // Estimativa universal de marchas para transmissões manuais e automáticas VW TSI (5 e 6 marchas / DSG)
@@ -590,11 +778,25 @@ class ObdBluetoothService extends ChangeNotifier {
       final boostPsi = double.parse((boostBar * 14.5038).toStringAsFixed(1));
       final stft = double.parse((sin(simTime * 1.5) * 2.5).toStringAsFixed(1));
       final volt = double.parse((14.1 + sin(simTime) * 0.15).toStringAsFixed(1));
+      final simMapKpa = (101 + (boostBar * 100)).round();
+
+      final adv = _computeAdvancedMetrics(
+        speed: speed,
+        rpm: rpm,
+        mapKpa: simMapKpa,
+        boostBar: boostBar,
+        load: load,
+        tps: tps,
+        timing: timing,
+        coolant: 90,
+        iat: 36,
+        dtSeconds: 0.05,
+      );
 
       _data = _data.copyWith(
         rpm: rpm,
         speed: speed,
-        mapKpa: (101 + (boostBar * 100)).round(),
+        mapKpa: simMapKpa,
         boostBar: boostBar,
         boostPsi: boostPsi,
         peakBoostBar: max(_peakBoost, boostBar),
@@ -606,6 +808,29 @@ class ObdBluetoothService extends ChangeNotifier {
         stft: stft,
         voltage: volt,
         gear: gear,
+        estimatedHp: adv['hp'],
+        estimatedTorqueNm: adv['torqueNm'],
+        estimatedTorqueKgfm: adv['torqueKgfm'],
+        peakHp: adv['peakHp'],
+        peakTorqueKgfm: adv['peakTorqueKgfm'],
+        fuelRailPressureBar: adv['railBar'],
+        lambda: adv['lambda'],
+        afr: adv['afr'],
+        oilTemperature: adv['oilTemp'],
+        egt: adv['egt'],
+        fuelConsumptionLh: adv['fuelLh'],
+        fuelConsumptionKml: adv['fuelKml'],
+        avgFuelConsumptionKml: adv['avgKml'],
+        totalFuelConsumedLiters: adv['totalFuel'],
+        tripDistanceKm: adv['tripKm'],
+        tripDurationMinutes: adv['tripMinutes'],
+        ethanolPercent: adv['ethanol'],
+        longitudinalGForce: adv['gLong'],
+        lateralGForce: adv['gLat'],
+        misfiresCyl1: _misfiresCyl1,
+        misfiresCyl2: _misfiresCyl2,
+        misfiresCyl3: _misfiresCyl3,
+        misfiresCyl4: _misfiresCyl4,
       );
 
       notifyListeners();

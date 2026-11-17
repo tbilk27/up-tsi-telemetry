@@ -23,6 +23,43 @@ class TelemetryData {
   final String vehicleProfile;
   final List<String> dtcs;
 
+  // 1. Virtual Dyno & Performance
+  final double estimatedHp;
+  final double estimatedTorqueNm;
+  final double estimatedTorqueKgfm;
+  final double peakHp;
+  final double peakTorqueKgfm;
+
+  // 2. High Pressure Fuel & Air/Fuel Mixture
+  final double fuelRailPressureBar;
+  final double lambda;
+  final double afr;
+
+  // 3. Oil & Exhaust Temperatures
+  final int oilTemperature;
+  final int egt;
+
+  // 4. Trip Computer & Eco / Flex
+  final double fuelConsumptionLh;
+  final double fuelConsumptionKml;
+  final double avgFuelConsumptionKml;
+  final double totalFuelConsumedLiters;
+  final double tripDistanceKm;
+  final double tripDurationMinutes;
+  final int ethanolPercent;
+  final double fuelPricePerLiter;
+
+  // 5. Cylinder Health & Misfire Counters
+  final int misfiresCyl1;
+  final int misfiresCyl2;
+  final int misfiresCyl3;
+  final int misfiresCyl4;
+  final double knockRetard;
+
+  // 6. Dynamics / G-Force
+  final double longitudinalGForce;
+  final double lateralGForce;
+
   const TelemetryData({
     this.isConnected = false,
     this.isSimulating = false,
@@ -47,6 +84,31 @@ class TelemetryData {
     this.protocol = 'CAN 11/500',
     this.vehicleProfile = 'VW TSI Universal',
     this.dtcs = const [],
+    this.estimatedHp = 0.0,
+    this.estimatedTorqueNm = 0.0,
+    this.estimatedTorqueKgfm = 0.0,
+    this.peakHp = 0.0,
+    this.peakTorqueKgfm = 0.0,
+    this.fuelRailPressureBar = 50.0,
+    this.lambda = 1.00,
+    this.afr = 14.7,
+    this.oilTemperature = 90,
+    this.egt = 450,
+    this.fuelConsumptionLh = 0.0,
+    this.fuelConsumptionKml = 0.0,
+    this.avgFuelConsumptionKml = 0.0,
+    this.totalFuelConsumedLiters = 0.0,
+    this.tripDistanceKm = 0.0,
+    this.tripDurationMinutes = 0.0,
+    this.ethanolPercent = 27,
+    this.fuelPricePerLiter = 5.89,
+    this.misfiresCyl1 = 0,
+    this.misfiresCyl2 = 0,
+    this.misfiresCyl3 = 0,
+    this.misfiresCyl4 = 0,
+    this.knockRetard = 0.0,
+    this.longitudinalGForce = 0.0,
+    this.lateralGForce = 0.0,
   });
 
   TelemetryData copyWith({
@@ -73,6 +135,31 @@ class TelemetryData {
     String? protocol,
     String? vehicleProfile,
     List<String>? dtcs,
+    double? estimatedHp,
+    double? estimatedTorqueNm,
+    double? estimatedTorqueKgfm,
+    double? peakHp,
+    double? peakTorqueKgfm,
+    double? fuelRailPressureBar,
+    double? lambda,
+    double? afr,
+    int? oilTemperature,
+    int? egt,
+    double? fuelConsumptionLh,
+    double? fuelConsumptionKml,
+    double? avgFuelConsumptionKml,
+    double? totalFuelConsumedLiters,
+    double? tripDistanceKm,
+    double? tripDurationMinutes,
+    int? ethanolPercent,
+    double? fuelPricePerLiter,
+    int? misfiresCyl1,
+    int? misfiresCyl2,
+    int? misfiresCyl3,
+    int? misfiresCyl4,
+    double? knockRetard,
+    double? longitudinalGForce,
+    double? lateralGForce,
   }) {
     return TelemetryData(
       isConnected: isConnected ?? this.isConnected,
@@ -98,6 +185,31 @@ class TelemetryData {
       protocol: protocol ?? this.protocol,
       vehicleProfile: vehicleProfile ?? this.vehicleProfile,
       dtcs: dtcs ?? this.dtcs,
+      estimatedHp: estimatedHp ?? this.estimatedHp,
+      estimatedTorqueNm: estimatedTorqueNm ?? this.estimatedTorqueNm,
+      estimatedTorqueKgfm: estimatedTorqueKgfm ?? this.estimatedTorqueKgfm,
+      peakHp: peakHp ?? this.peakHp,
+      peakTorqueKgfm: peakTorqueKgfm ?? this.peakTorqueKgfm,
+      fuelRailPressureBar: fuelRailPressureBar ?? this.fuelRailPressureBar,
+      lambda: lambda ?? this.lambda,
+      afr: afr ?? this.afr,
+      oilTemperature: oilTemperature ?? this.oilTemperature,
+      egt: egt ?? this.egt,
+      fuelConsumptionLh: fuelConsumptionLh ?? this.fuelConsumptionLh,
+      fuelConsumptionKml: fuelConsumptionKml ?? this.fuelConsumptionKml,
+      avgFuelConsumptionKml: avgFuelConsumptionKml ?? this.avgFuelConsumptionKml,
+      totalFuelConsumedLiters: totalFuelConsumedLiters ?? this.totalFuelConsumedLiters,
+      tripDistanceKm: tripDistanceKm ?? this.tripDistanceKm,
+      tripDurationMinutes: tripDurationMinutes ?? this.tripDurationMinutes,
+      ethanolPercent: ethanolPercent ?? this.ethanolPercent,
+      fuelPricePerLiter: fuelPricePerLiter ?? this.fuelPricePerLiter,
+      misfiresCyl1: misfiresCyl1 ?? this.misfiresCyl1,
+      misfiresCyl2: misfiresCyl2 ?? this.misfiresCyl2,
+      misfiresCyl3: misfiresCyl3 ?? this.misfiresCyl3,
+      misfiresCyl4: misfiresCyl4 ?? this.misfiresCyl4,
+      knockRetard: knockRetard ?? this.knockRetard,
+      longitudinalGForce: longitudinalGForce ?? this.longitudinalGForce,
+      lateralGForce: lateralGForce ?? this.lateralGForce,
     );
   }
 }
