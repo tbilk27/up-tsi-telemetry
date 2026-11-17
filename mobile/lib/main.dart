@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/obd_bluetooth_service.dart';
+import 'services/performance_meter_service.dart';
 import 'screens/dashboard_screen.dart';
 
 void main() {
@@ -17,6 +18,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ObdBluetoothService()),
+        ChangeNotifierProvider(create: (_) => PerformanceMeterService()),
       ],
       child: const UpTsiTelemetryApp(),
     ),

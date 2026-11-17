@@ -58,6 +58,7 @@ class ObdBluetoothService extends ChangeNotifier {
   double _dynamicPeakBoost = 0.0;
   DateTime _dynamicPeakTimestamp = DateTime.now();
   int _shiftRpm = 5200;
+  int _peakHoldSeconds = 10; // Default 10 seconds (configurable)
 
   Completer<String>? _currentCompleter;
   final StringBuffer _rxAccumulator = StringBuffer();
@@ -73,11 +74,17 @@ class ObdBluetoothService extends ChangeNotifier {
   bool get isSimulating => _data.isSimulating;
   List<ObdLogEntry> get logs => List.unmodifiable(_logs);
   int get shiftRpm => _shiftRpm;
+  int get peakHoldSeconds => _peakHoldSeconds;
   double get dynamicPeakBoost => _dynamicPeakBoost;
 
   void setShiftRpm(int rpm) {
     _shiftRpm = rpm;
     _data = _data.copyWith(shiftRpm: rpm);
+    notifyListeners();
+  }
+
+  void setPeakHoldSeconds(int seconds) {
+    _peakHoldSeconds = seconds;
     notifyListeners();
   }
 
@@ -88,8 +95,8 @@ class ObdBluetoothService extends ChangeNotifier {
       _dynamicPeakTimestamp = now;
     } else {
       final elapsed = now.difference(_dynamicPeakTimestamp);
-      if (elapsed.inSeconds >= 120) {
-        // Após 2 minutos sem superar o valor máximo, reduz suavemente em direção ao boost atual
+      if (elapsed.inSeconds >= _peakHoldSeconds) {
+        // Após o tempo de retenção sem superar o valor máximo, reduz suavemente em direção ao boost atual
         _dynamicPeakBoost = max(currentBoost, _dynamicPeakBoost - 0.015);
       }
     }

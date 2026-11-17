@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/obd_bluetooth_service.dart';
+import '../services/performance_meter_service.dart';
 import '../widgets/tachometer_gauge.dart';
 import '../widgets/boost_gauge.dart';
 import '../widgets/shift_light_bar.dart';
 import '../widgets/sensor_card.dart';
+import '../widgets/performance_meter_view.dart';
 import 'bluetooth_connect_screen.dart';
 import 'obd_terminal_screen.dart';
 
@@ -22,9 +24,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _currentPage = 0;
   bool _isScanning = false;
   FullscreenGauge _fullscreenGauge = FullscreenGauge.none;
+  VoidCallback? _obdListener;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final obd = Provider.of<ObdBluetoothService>(context, listen: false);
+      final meter = Provider.of<PerformanceMeterService>(context, listen: false);
+      _obdListener = () {
+        meter.updateTelemetry(obd.data.speed, obd.data.boostBar, obd.data.rpm);
+      };
+      obd.addListener(_obdListener!);
+    });
+  }
 
   @override
   void dispose() {
+    if (_obdListener != null) {
+      final obd = Provider.of<ObdBluetoothService>(context, listen: false);
+      obd.removeListener(_obdListener!);
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -254,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
 
-                  // Swipe Tabs Indicator (Telemetria vs Alertas)
+                  // Swipe Tabs Indicator (Telemetria vs Arrancada vs Ajustes)
                   Container(
                     padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
@@ -272,10 +293,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           isActive: _currentPage == 0,
                         ),
                         _buildTabButton(
-                          title: 'Alertas',
-                          icon: Icons.warning_amber_rounded,
+                          title: 'Arrancada',
+                          icon: Icons.timer,
                           index: 1,
                           isActive: _currentPage == 1,
+                        ),
+                        _buildTabButton(
+                          title: 'Ajustes',
+                          icon: Icons.tune,
+                          index: 2,
+                          isActive: _currentPage == 2,
                           badgeCount: totalIssues,
                         ),
                       ],
@@ -364,7 +391,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   // PAGE 0: Main Telemetry Dashboard
                   _buildTelemetryDashboardPage(obd, data, isLandscape, isShiftPoint),
 
-                  // PAGE 1: Alerts, Messages & DTC Errors Page
+                  // PAGE 1: Drag Race Performance Meter
+                  PerformanceMeterView(isLandscape: isLandscape),
+
+                  // PAGE 2: Alerts, DTC Errors & Settings (Shift-light & Peak Hold)
                   _buildAlertsAndErrorsPage(obd, data, liveAlerts),
                 ],
               ),
@@ -404,7 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon,
               size: 14,
               color: isActive
-                  ? (index == 1 && badgeCount > 0 ? const Color(0xFFFF5252) : const Color(0xFF00E676))
+                  ? (index == 2 && badgeCount > 0 ? const Color(0xFFFF5252) : const Color(0xFF00E676))
                   : const Color(0xFF7387A8),
             ),
             const SizedBox(width: 4),
@@ -863,6 +893,110 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       Text('6.500 RPM', style: TextStyle(fontSize: 10, color: Color(0xFF677B99))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Card: Retenção de Pico de Pressão de Turbo (Peak Hold)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E131D),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF202B3D)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.timer_outlined, color: Color(0xFFFF1744), size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'RETENÇÃO DO PICO DE TURBO',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF1744).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFF1744)),
+                      ),
+                      child: Text(
+                        '${obd.peakHoldSeconds}s',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFF1744),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tempo em que a linha vermelha congela no valor máximo atingido antes de iniciar a descida gradual. Padrão: 10 segundos.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF8B9BB4), height: 1.3),
+                ),
+                const SizedBox(height: 12),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFFFF1744),
+                    inactiveTrackColor: const Color(0xFF263248),
+                    thumbColor: const Color(0xFFFF1744),
+                    overlayColor: const Color(0xFFFF1744).withValues(alpha: 0.2),
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    trackHeight: 6,
+                    valueIndicatorColor: const Color(0xFF0D121C),
+                    valueIndicatorTextStyle: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFF1744),
+                    ),
+                  ),
+                  child: Slider(
+                    value: obd.peakHoldSeconds.toDouble().clamp(3.0, 60.0),
+                    min: 3.0,
+                    max: 60.0,
+                    divisions: 57, // passos de 1 em 1 segundo
+                    label: '${obd.peakHoldSeconds}s',
+                    onChanged: (newVal) {
+                      obd.setPeakHoldSeconds(newVal.round());
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text('3s', style: TextStyle(fontSize: 10, color: Color(0xFF677B99))),
+                      Text(
+                        '10s (Padrão Recomendado)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFFF1744),
+                        ),
+                      ),
+                      Text('60s', style: TextStyle(fontSize: 10, color: Color(0xFF677B99))),
                     ],
                   ),
                 ),
