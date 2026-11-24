@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:up_tsi_telemetry/models/telemetry_data.dart';
 import 'package:up_tsi_telemetry/services/fuel_log_service.dart';
 import 'package:up_tsi_telemetry/services/obd_bluetooth_service.dart';
+import 'package:up_tsi_telemetry/services/trip_logger_service.dart';
 
 void main() {
   test('ObdBluetoothService initial state and settings', () {
@@ -27,5 +29,26 @@ void main() {
       isFullTank: true,
     );
     expect(fuelLog.overallAverageKml, 14.0);
+  });
+
+  test('TripLoggerService records telemetry sample and saves trip', () async {
+    final logger = TripLoggerService();
+    logger.recordSample(const TelemetryData(
+      isSimulating: true,
+      rpm: 2800,
+      speed: 75,
+      boostBar: 0.65,
+      estimatedHp: 98.5,
+      tripDistanceKm: 5.2,
+    ));
+    expect(logger.isRecording, isTrue);
+    expect(logger.activeSampleCount, 1);
+
+    final record = await logger.finishAndSaveTrip();
+    expect(record, isNotNull);
+    expect(record!.maxSpeedKmh, 75);
+    expect(record.maxRpm, 2800);
+    expect(record.maxBoostBar, 0.65);
+    expect(logger.history.length, 1);
   });
 }

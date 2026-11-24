@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'services/obd_bluetooth_service.dart';
 import 'services/performance_meter_service.dart';
 import 'services/fuel_log_service.dart';
+import 'services/trip_logger_service.dart';
 import 'screens/dashboard_screen.dart';
 
 void main() {
@@ -21,6 +22,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ObdBluetoothService()),
         ChangeNotifierProvider(create: (_) => PerformanceMeterService()),
         ChangeNotifierProvider(create: (_) => FuelLogService()..init()),
+        ChangeNotifierProvider(create: (_) => TripLoggerService()..init()),
       ],
       child: const UpTsiTelemetryApp(),
     ),

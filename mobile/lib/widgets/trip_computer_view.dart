@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/obd_bluetooth_service.dart';
 import '../services/fuel_log_service.dart';
+import '../services/trip_logger_service.dart';
 import '../models/fuel_log_entry.dart';
+import '../models/trip_log_record.dart';
+import '../screens/trip_detail_screen.dart';
 
 class TripComputerView extends StatelessWidget {
   final bool isLandscape;
@@ -16,13 +19,14 @@ class TripComputerView extends StatelessWidget {
   Widget build(BuildContext context) {
     final obd = Provider.of<ObdBluetoothService>(context);
     final fuelLog = Provider.of<FuelLogService>(context);
+    final tripLogger = Provider.of<TripLoggerService>(context);
     final data = obd.data;
 
     return Container(
       color: const Color(0xFF0A0D14),
       child: isLandscape
-          ? _buildLandscapeLayout(context, obd, data, fuelLog)
-          : _buildPortraitLayout(context, obd, data, fuelLog),
+          ? _buildLandscapeLayout(context, obd, data, fuelLog, tripLogger)
+          : _buildPortraitLayout(context, obd, data, fuelLog, tripLogger),
     );
   }
 
@@ -31,6 +35,7 @@ class TripComputerView extends StatelessWidget {
     ObdBluetoothService obd,
     dynamic data,
     FuelLogService fuelLog,
+    TripLoggerService tripLogger,
   ) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -58,7 +63,12 @@ class TripComputerView extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // 5. Módulo de Registro de Abastecimento & Consumo Real na Bomba
+          // 5. Histórico de Viagens (Datalogger Completo)
+          _buildTripHistoryLoggerSection(context, tripLogger),
+
+          const SizedBox(height: 14),
+
+          // 6. Módulo de Registro de Abastecimento & Consumo Real na Bomba
           _buildFuelLogSection(context, obd, data, fuelLog),
 
           const SizedBox(height: 24),
@@ -72,6 +82,7 @@ class TripComputerView extends StatelessWidget {
     ObdBluetoothService obd,
     dynamic data,
     FuelLogService fuelLog,
+    TripLoggerService tripLogger,
   ) {
     return Row(
       children: [
@@ -93,7 +104,7 @@ class TripComputerView extends StatelessWidget {
           ),
         ),
 
-        // Lado Direito: Teor de Etanol e Registro de Abastecimento
+        // Lado Direito: Teor de Etanol, Datalogger de Viagens e Abastecimento
         Expanded(
           flex: 6,
           child: SingleChildScrollView(
@@ -102,6 +113,8 @@ class TripComputerView extends StatelessWidget {
             child: Column(
               children: [
                 _buildEthanolFlexCard(context, data),
+                const SizedBox(height: 8),
+                _buildTripHistoryLoggerSection(context, tripLogger, compact: true),
                 const SizedBox(height: 8),
                 _buildFuelLogSection(context, obd, data, fuelLog, compact: true),
               ],
@@ -1223,6 +1236,228 @@ class TripComputerView extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  // Histórico de Viagens (Datalogger Completo de Todos os Sensores)
+  Widget _buildTripHistoryLoggerSection(
+    BuildContext context,
+    TripLoggerService tripLogger, {
+    bool compact = false,
+  }) {
+    final history = tripLogger.history;
+    final isRecording = tripLogger.isRecording;
+    final sampleCount = tripLogger.activeSampleCount;
+
+    return Container(
+      padding: EdgeInsets.all(compact ? 12 : 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E131D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isRecording ? const Color(0xFFE51A24).withValues(alpha: 0.6) : const Color(0xFF202B3D),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.timeline, color: Color(0xFF00A8FF), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'HISTÓRICO DE VIAGENS (LOGGER)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              if (isRecording)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E676),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.save, size: 13),
+                  label: const Text('Salvar Agora', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+                  onPressed: () async {
+                    final saved = await tripLogger.finishAndSaveTrip();
+                    if (saved != null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFF00E676),
+                          content: Text('Viagem salva com ${saved.sampleCount} amostras completas!'),
+                        ),
+                      );
+                    }
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Grava automaticamente 1 amostra/segundo de todos os 25+ parâmetros (RPM, Turbo, Temperaturas, Sonda, Potência, G-Force). Toque em uma viagem para ver gráficos e exportar CSV.',
+            style: TextStyle(fontSize: 10, color: Color(0xFF8B9BB4), height: 1.3),
+          ),
+
+          if (isRecording) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2B1216),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE51A24)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(color: Color(0xFFFF5252), shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'GRAVANDO VIAGEM ATUAL',
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '$sampleCount pts (1Hz)',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFF8A80),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          if (history.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              alignment: Alignment.center,
+              child: const Text(
+                'Nenhuma viagem finalizada ainda.\nAo conectar ao OBDII ou simular, a viagem é gravada e salva automaticamente.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10.5, color: Color(0xFF677B99)),
+              ),
+            )
+          else
+            ...history.take(8).map((trip) => _buildTripRecordItem(context, trip, tripLogger)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripRecordItem(BuildContext context, TripLogRecord trip, TripLoggerService tripLogger) {
+    final dateStr =
+        '${trip.startTime.day.toString().padLeft(2, '0')}/${trip.startTime.month.toString().padLeft(2, '0')} '
+        '${trip.startTime.hour.toString().padLeft(2, '0')}:${trip.startTime.minute.toString().padLeft(2, '0')}';
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => TripDetailScreen(trip: trip)),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 7),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF121722),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF222C3E)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        dateStr,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2438),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          '${trip.sampleCount} pts',
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 9, color: Color(0xFF00E5FF)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${trip.distanceKm.toStringAsFixed(1)} km • ${trip.durationMinutes.toStringAsFixed(1)} min • Máx ${trip.maxSpeedKmh} km/h • ${trip.maxBoostBar.toStringAsFixed(2)} bar • ${trip.maxHp.toStringAsFixed(0)} CV',
+                    style: const TextStyle(fontSize: 9.5, color: Color(0xFF8B9BB4)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (trip.avgConsumptionKml > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${trip.avgConsumptionKml.toStringAsFixed(1)} km/L',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF00E676),
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFF677B99)),
+                  onPressed: () => tripLogger.deleteTrip(trip.id),
+                ),
+                const Icon(Icons.chevron_right, size: 16, color: Color(0xFF677B99)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

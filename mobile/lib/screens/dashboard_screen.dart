@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/obd_bluetooth_service.dart';
 import '../services/performance_meter_service.dart';
+import '../services/trip_logger_service.dart';
 import '../widgets/tachometer_gauge.dart';
 import '../widgets/boost_gauge.dart';
 import '../widgets/shift_light_bar.dart';
@@ -50,8 +51,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       final obd = Provider.of<ObdBluetoothService>(context, listen: false);
       final meter = Provider.of<PerformanceMeterService>(context, listen: false);
+      final tripLogger = Provider.of<TripLoggerService>(context, listen: false);
       _obdListener = () {
         meter.updateTelemetry(obd.data.speed, obd.data.boostBar, obd.data.rpm);
+        tripLogger.recordSample(obd.data);
       };
       obd.addListener(_obdListener!);
       obd.tryAutoReconnect();
