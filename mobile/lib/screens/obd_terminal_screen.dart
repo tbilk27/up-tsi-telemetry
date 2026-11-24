@@ -171,6 +171,23 @@ class _ObdTerminalScreenState extends State<ObdTerminalScreen> {
             ),
           ),
 
+          if (obd.activeLogFilePath != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              color: const Color(0xFF101826),
+              child: Text(
+                'Auto-Log Bruto: ${obd.activeLogFilePath}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 9.5,
+                  color: Color(0xFF00E676),
+                ),
+              ),
+            ),
+
           // Quick Command Test Chips
           Container(
             height: 38,

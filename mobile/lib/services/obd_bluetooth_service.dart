@@ -65,6 +65,9 @@ class ObdBluetoothService extends ChangeNotifier {
   Completer<String>? _currentCompleter;
   final StringBuffer _rxAccumulator = StringBuffer();
   final List<ObdLogEntry> _logs = [];
+  final List<String> _pendingLogLines = [];
+  File? _activeLogFile;
+  Timer? _logFlushTimer;
 
   Timer? _simulationTimer;
 
@@ -75,6 +78,7 @@ class ObdBluetoothService extends ChangeNotifier {
   bool get isConnected => _data.isConnected;
   bool get isSimulating => _data.isSimulating;
   List<ObdLogEntry> get logs => List.unmodifiable(_logs);
+  String? get activeLogFilePath => _activeLogFile?.path;
   int get shiftRpm => _shiftRpm;
   int get peakHoldSeconds => _peakHoldSeconds;
   String get vehicleProfile => _vehicleProfile;
@@ -238,15 +242,88 @@ class ObdBluetoothService extends ChangeNotifier {
     return sb.toString();
   }
 
+  File? _resolveWritableLogFile(String filename) {
+    final candidateDirs = [
+      '/sdcard/Download',
+      '/sdcard/Android/data/com.antigravity.uptsi/files/obd_logs',
+      '/data/user/0/com.antigravity.uptsi/files/obd_logs',
+    ];
+    for (final dirPath in candidateDirs) {
+      try {
+        final dir = Directory(dirPath);
+        if (!dir.existsSync()) {
+          dir.createSync(recursive: true);
+        }
+        final file = File('$dirPath/$filename');
+        // Testa permissão de escrita criando/abrindo o arquivo
+        file.writeAsStringSync('', mode: FileMode.append, flush: true);
+        return file;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  void _initSessionLogFile(BluetoothDevice device) {
+    _flushPendingLogsSync();
+    _logFlushTimer?.cancel();
+
+    final now = DateTime.now();
+    final stamp =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
+    _activeLogFile = _resolveWritableLogFile('obd_raw_log_$stamp.txt');
+    if (_activeLogFile != null) {
+      final header = StringBuffer()
+        ..writeln('=== VW TSI TELEMETRY OBDII RAW LOG (AUTO-LOGGER) ===')
+        ..writeln('Inicio: ${now.toIso8601String()}')
+        ..writeln('Dispositivo: ${device.name ?? "N/A"} (${device.address})')
+        ..writeln('Perfil Ativo: $_vehicleProfile')
+        ..writeln('----------------------------------------');
+      try {
+        _activeLogFile!.writeAsStringSync(header.toString(), mode: FileMode.append, flush: true);
+      } catch (e) {
+        debugPrint('Erro ao escrever cabeçalho do log bruto: $e');
+      }
+      _logFlushTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        _flushPendingLogsSync();
+      });
+    }
+  }
+
+  void _queueLogLine(ObdLogEntry entry) {
+    if (_activeLogFile == null) return;
+    _pendingLogLines.add(entry.toLogLine());
+    if (_pendingLogLines.length >= 25) {
+      _flushPendingLogsSync();
+    }
+  }
+
+  void _flushPendingLogsSync() {
+    if (_activeLogFile == null || _pendingLogLines.isEmpty) return;
+    try {
+      final chunk = '${_pendingLogLines.join('\n')}\n';
+      _pendingLogLines.clear();
+      _activeLogFile!.writeAsStringSync(chunk, mode: FileMode.append, flush: true);
+    } catch (e) {
+      debugPrint('Erro ao gravar log bruto OBDII: $e');
+    }
+  }
+
   Future<String?> saveLogToFile() async {
     try {
-      final text = exportLogsAsText();
-      final dir = Directory('/sdcard/Download');
-      if (!dir.existsSync()) {
-        dir.createSync(recursive: true);
+      _flushPendingLogsSync();
+      if (_activeLogFile != null && _activeLogFile!.existsSync()) {
+        return _activeLogFile!.path;
       }
-      final file = File('/sdcard/Download/obd_log_uptsi.txt');
-      await file.writeAsString(text);
+      final text = exportLogsAsText();
+      final now = DateTime.now();
+      final stamp =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
+          '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      final file = _resolveWritableLogFile('obd_raw_log_$stamp.txt');
+      if (file == null) return null;
+      await file.writeAsString(text, flush: true);
       return file.path;
     } catch (e) {
       debugPrint('Erro ao salvar log: $e');
@@ -380,6 +457,7 @@ class ObdBluetoothService extends ChangeNotifier {
 
     try {
       _connection = await BluetoothConnection.toAddress(device.address);
+      _initSessionLogFile(device);
       _status = BluetoothStateStatus.initializing;
       _statusMessage = 'Inicializando ELM327...';
       notifyListeners();
@@ -402,7 +480,16 @@ class ObdBluetoothService extends ChangeNotifier {
       // Query Battery Voltage & Protocol
       final voltResp = await _sendCommand('ATRV');
       final protoResp = await _sendCommand('ATDP');
-      await _sendCommand('0100'); // Probe supported PIDs to wake up ECU
+      // Probe supported PID bitmasks, odometer & VIN for diagnostics/logging
+      await _sendCommand('0100');
+      await _sendCommand('0120');
+      await _sendCommand('0140');
+      await _sendCommand('0160');
+      await _sendCommand('0180');
+      await _sendCommand('01A0');
+      await _sendCommand('01A6');
+      await _sendCommand('0131');
+      await _sendCommand('0902', timeout: const Duration(milliseconds: 900));
 
       double initialVolt = 12.3;
       final voltMatch = RegExp(r'(\d+\.?\d*)V', caseSensitive: false).firstMatch(voltResp);
@@ -481,28 +568,32 @@ class ObdBluetoothService extends ChangeNotifier {
       if (_logs.length >= 250) {
         _logs.removeAt(0);
       }
-      _logs.add(ObdLogEntry(
+      final entry = ObdLogEntry(
         timestamp: DateTime.now(),
         command: cmd,
         rawResponse: rawResponse.trim(),
         cleanResponse: clean,
         latencyMs: stopwatch.elapsedMilliseconds,
         success: isSuccess,
-      ));
+      );
+      _logs.add(entry);
+      _queueLogLine(entry);
       notifyListeners();
 
       return rawResponse;
     } catch (e) {
       stopwatch.stop();
       if (_logs.length >= 250) _logs.removeAt(0);
-      _logs.add(ObdLogEntry(
+      final errEntry = ObdLogEntry(
         timestamp: DateTime.now(),
         command: cmd,
         rawResponse: 'ERROR: $e',
         cleanResponse: 'ERROR',
         latencyMs: stopwatch.elapsedMilliseconds,
         success: false,
-      ));
+      );
+      _logs.add(errEntry);
+      _queueLogLine(errEntry);
       notifyListeners();
       return '';
     } finally {
@@ -1065,6 +1156,9 @@ class ObdBluetoothService extends ChangeNotifier {
     _isPolling = false;
     _simulationTimer?.cancel();
     _simulationTimer = null;
+    _logFlushTimer?.cancel();
+    _logFlushTimer = null;
+    _flushPendingLogsSync();
 
     if (_currentCompleter != null && !_currentCompleter!.isCompleted) {
       _currentCompleter!.complete('');
