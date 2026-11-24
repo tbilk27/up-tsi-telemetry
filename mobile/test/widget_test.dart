@@ -1,30 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:up_tsi_telemetry/main.dart';
+import 'package:up_tsi_telemetry/services/fuel_log_service.dart';
+import 'package:up_tsi_telemetry/services/obd_bluetooth_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('ObdBluetoothService initial state and settings', () {
+    final obd = ObdBluetoothService();
+    expect(obd.isConnected, isFalse);
+    expect(obd.isSimulating, isFalse);
+    expect(obd.shiftRpm, 5200);
+    obd.setShiftRpm(5800);
+    expect(obd.shiftRpm, 5800);
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('FuelLogService calculates consumption on full tank entries', () async {
+    final fuelLog = FuelLogService();
+    await fuelLog.addEntry(
+      liters: 40.0,
+      totalPrice: 240.0,
+      odometerKm: 10000.0,
+      isFullTank: true,
+    );
+    await fuelLog.addEntry(
+      liters: 40.0,
+      totalPrice: 240.0,
+      odometerKm: 10560.0,
+      isFullTank: true,
+    );
+    expect(fuelLog.overallAverageKml, 14.0);
   });
 }

@@ -54,6 +54,7 @@ class ObdBluetoothService extends ChangeNotifier {
   TelemetryData _data = const TelemetryData();
 
   bool _isPolling = false;
+  bool _autoReconnectAttempted = false;
   double _peakBoost = 0.0;
   double _dynamicPeakBoost = 0.0;
   DateTime _dynamicPeakTimestamp = DateTime.now();
@@ -278,6 +279,97 @@ class ObdBluetoothService extends ChangeNotifier {
     }
   }
 
+  File _getLastDeviceFile() {
+    final candidateDirs = [
+      '/data/user/0/com.antigravity.uptsi/files',
+      '/data/data/com.antigravity.uptsi/files',
+    ];
+    for (final d in candidateDirs) {
+      try {
+        final dir = Directory(d);
+        if (!dir.existsSync()) {
+          dir.createSync(recursive: true);
+        }
+        return File('${dir.path}/last_obd_device_v1.json');
+      } catch (_) {}
+    }
+    return File('${Directory.systemTemp.path}/last_obd_device_v1.json');
+  }
+
+  Future<void> _saveLastDevice(BluetoothDevice device) async {
+    try {
+      final file = _getLastDeviceFile();
+      final payload = {
+        'address': device.address,
+        'name': device.name ?? 'OBDII',
+        'savedAt': DateTime.now().toIso8601String(),
+      };
+      await file.writeAsString(jsonEncode(payload), flush: true);
+    } catch (e) {
+      debugPrint('Erro ao salvar último dispositivo OBDII: $e');
+    }
+  }
+
+  Future<Map<String, String>?> _loadLastDevice() async {
+    try {
+      final file = _getLastDeviceFile();
+      if (!file.existsSync()) return null;
+      final raw = await file.readAsString();
+      if (raw.isEmpty) return null;
+      final Map<String, dynamic> decoded = jsonDecode(raw);
+      final address = decoded['address'] as String?;
+      if (address == null || address.isEmpty) return null;
+      return {
+        'address': address,
+        'name': (decoded['name'] as String?) ?? 'OBDII',
+      };
+    } catch (e) {
+      debugPrint('Erro ao carregar último dispositivo OBDII: $e');
+      return null;
+    }
+  }
+
+  /// Tenta reconectar automaticamente ao último adaptador OBDII Bluetooth conectado
+  Future<void> tryAutoReconnect() async {
+    if (_autoReconnectAttempted) return;
+    _autoReconnectAttempted = true;
+
+    if (kIsWeb || !Platform.isAndroid) return;
+    if (isConnected || isSimulating) return;
+    if (_status == BluetoothStateStatus.connecting ||
+        _status == BluetoothStateStatus.initializing) {
+      return;
+    }
+
+    final last = await _loadLastDevice();
+    if (last == null) return;
+
+    final address = last['address']!;
+    final name = last['name'] ?? 'OBDII';
+
+    try {
+      final hasPerm = await requestPermissions();
+      if (!hasPerm) return;
+
+      final isEnabled = await FlutterBluetoothSerial.instance.isEnabled ?? false;
+      if (!isEnabled) return;
+
+      final bonded = await FlutterBluetoothSerial.instance.getBondedDevices();
+      BluetoothDevice? target;
+      for (final d in bonded) {
+        if (d.address == address) {
+          target = d;
+          break;
+        }
+      }
+      target ??= BluetoothDevice(address: address, name: name);
+
+      await connect(target);
+    } catch (e) {
+      debugPrint('Reconexão automática não concluída: $e');
+    }
+  }
+
   // Connect to a Bluetooth OBD-II device
   Future<void> connect(BluetoothDevice device) async {
     disconnect();
@@ -327,6 +419,7 @@ class ObdBluetoothService extends ChangeNotifier {
 
       _status = BluetoothStateStatus.connected;
       _statusMessage = 'Conectado à ECU VW TSI';
+      await _saveLastDevice(device);
       notifyListeners();
 
       _startPollingLoop();

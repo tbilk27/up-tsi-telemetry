@@ -54,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         meter.updateTelemetry(obd.data.speed, obd.data.boostBar, obd.data.rpm);
       };
       obd.addListener(_obdListener!);
+      obd.tryAutoReconnect();
     });
   }
 
@@ -634,6 +635,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Pílula de status de conexão Bluetooth
   Widget _buildBluetoothPill(ObdBluetoothService obd) {
+    final isConnecting = obd.status == BluetoothStateStatus.connecting ||
+        obd.status == BluetoothStateStatus.initializing;
+
+    final Color dotColor = obd.isConnected
+        ? const Color(0xFF00E676)
+        : (isConnecting ? const Color(0xFFFFD600) : const Color(0xFFFF5252));
+
+    final String labelText = obd.isSimulating
+        ? 'MOCK'
+        : (obd.isConnected
+            ? 'OBDII ON'
+            : (isConnecting ? 'CONECTANDO...' : 'CONECTAR'));
+
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -649,7 +663,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF0F131A),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF242E42)),
+          border: Border.all(
+            color: isConnecting ? const Color(0xFFFFD600).withValues(alpha: 0.6) : const Color(0xFF242E42),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -659,20 +675,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: obd.isConnected
-                    ? const Color(0xFF00E676)
-                    : const Color(0xFFFF5252),
+                color: dotColor,
               ),
             ),
             const SizedBox(width: 6),
             Text(
-              obd.isSimulating
-                  ? 'MOCK'
-                  : (obd.isConnected ? 'OBDII ON' : 'CONECTAR'),
-              style: const TextStyle(
+              labelText,
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFC0CDE0),
+                color: isConnecting ? const Color(0xFFFFD600) : const Color(0xFFC0CDE0),
               ),
             ),
           ],
