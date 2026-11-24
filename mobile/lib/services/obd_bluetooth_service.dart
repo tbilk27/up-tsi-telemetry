@@ -109,6 +109,18 @@ class ObdBluetoothService extends ChangeNotifier {
     notifyListeners();
   }
 
+  double _baseOdometer = 64250.0;
+  double get baseOdometer => _baseOdometer;
+
+  void setBaseOdometer(double km) {
+    _baseOdometer = km;
+    _data = _data.copyWith(
+      odometerKm: km + _tripDistanceKm,
+      odometerSource: 'Calibrado Manualmente',
+    );
+    notifyListeners();
+  }
+
   void setFuelPrice(double price) {
     _fuelPricePerLiter = price;
     _data = _data.copyWith(fuelPricePerLiter: price);
@@ -535,6 +547,43 @@ class ObdBluetoothService extends ChangeNotifier {
       }
     }
 
+    // 6. Infrequent Priority (every 30 cycles ~ 15s): Odômetro (01A6) & Distância pós-DTC (0131)
+    double odoKm = _data.odometerKm > 0 ? _data.odometerKm : (_baseOdometer + _tripDistanceKm);
+    String odoSource = _data.odometerSource;
+    int distDtc = _data.distanceSinceDtcClearKm;
+
+    if (cycle % 30 == 1) {
+      final odoRaw = await _sendCommand('01A6', timeout: const Duration(milliseconds: 600));
+      final odoClean = _cleanResponse(odoRaw);
+      final odoMatch = RegExp(r'41A6([0-9A-F]{8})').firstMatch(odoClean);
+      if (odoMatch != null) {
+        final hex = odoMatch.group(1)!;
+        final rawVal = int.tryParse(hex, radix: 16);
+        if (rawVal != null && rawVal > 0) {
+          odoKm = double.parse((rawVal / 10.0).toStringAsFixed(1));
+          odoSource = 'ECU (PID 01A6)';
+          _baseOdometer = odoKm;
+        }
+      } else {
+        odoKm = double.parse((_baseOdometer + _tripDistanceKm).toStringAsFixed(1));
+        if (odoSource != 'ECU (PID 01A6)') {
+          odoSource = 'Odômetro Calibrado';
+        }
+      }
+
+      final dtcDistRaw = await _sendCommand('0131', timeout: const Duration(milliseconds: 600));
+      final dtcDistClean = _cleanResponse(dtcDistRaw);
+      final dtcDistMatch = RegExp(r'4131([0-9A-F]{4})').firstMatch(dtcDistClean);
+      if (dtcDistMatch != null) {
+        final rawVal = int.tryParse(dtcDistMatch.group(1)!, radix: 16);
+        if (rawVal != null) distDtc = rawVal;
+      }
+    } else {
+      if (odoSource != 'ECU (PID 01A6)') {
+        odoKm = double.parse((_baseOdometer + _tripDistanceKm).toStringAsFixed(1));
+      }
+    }
+
     _updateDynamicPeak(boostBar);
 
     final adv = _computeAdvancedMetrics(
@@ -585,6 +634,9 @@ class ObdBluetoothService extends ChangeNotifier {
       tripDistanceKm: adv['tripKm'],
       tripDurationMinutes: adv['tripMinutes'],
       ethanolPercent: adv['ethanol'],
+      odometerKm: odoKm,
+      odometerSource: odoSource,
+      distanceSinceDtcClearKm: distDtc,
       longitudinalGForce: adv['gLong'],
       lateralGForce: adv['gLat'],
       misfiresCyl1: _misfiresCyl1,
@@ -839,6 +891,9 @@ class ObdBluetoothService extends ChangeNotifier {
         tripDistanceKm: adv['tripKm'],
         tripDurationMinutes: adv['tripMinutes'],
         ethanolPercent: adv['ethanol'],
+        odometerKm: double.parse((_baseOdometer + adv['tripKm']).toStringAsFixed(1)),
+        odometerSource: 'Simulação',
+        distanceSinceDtcClearKm: 1420,
         longitudinalGForce: adv['gLong'],
         lateralGForce: adv['gLat'],
         misfiresCyl1: _misfiresCyl1,

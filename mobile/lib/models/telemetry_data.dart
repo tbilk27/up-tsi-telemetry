@@ -48,6 +48,9 @@ class TelemetryData {
   final double tripDurationMinutes;
   final int ethanolPercent;
   final double fuelPricePerLiter;
+  final double odometerKm;
+  final String odometerSource;
+  final int distanceSinceDtcClearKm;
 
   // 5. Cylinder Health & Misfire Counters
   final int misfiresCyl1;
@@ -104,6 +107,9 @@ class TelemetryData {
     this.tripDurationMinutes = 0.0,
     this.ethanolPercent = 27,
     this.fuelPricePerLiter = 5.89,
+    this.odometerKm = 0.0,
+    this.odometerSource = 'Calculado',
+    this.distanceSinceDtcClearKm = 0,
     this.misfiresCyl1 = 0,
     this.misfiresCyl2 = 0,
     this.misfiresCyl3 = 0,
@@ -157,6 +163,9 @@ class TelemetryData {
     double? tripDurationMinutes,
     int? ethanolPercent,
     double? fuelPricePerLiter,
+    double? odometerKm,
+    String? odometerSource,
+    int? distanceSinceDtcClearKm,
     int? misfiresCyl1,
     int? misfiresCyl2,
     int? misfiresCyl3,
@@ -209,6 +218,9 @@ class TelemetryData {
       tripDurationMinutes: tripDurationMinutes ?? this.tripDurationMinutes,
       ethanolPercent: ethanolPercent ?? this.ethanolPercent,
       fuelPricePerLiter: fuelPricePerLiter ?? this.fuelPricePerLiter,
+      odometerKm: odometerKm ?? this.odometerKm,
+      odometerSource: odometerSource ?? this.odometerSource,
+      distanceSinceDtcClearKm: distanceSinceDtcClearKm ?? this.distanceSinceDtcClearKm,
       misfiresCyl1: misfiresCyl1 ?? this.misfiresCyl1,
       misfiresCyl2: misfiresCyl2 ?? this.misfiresCyl2,
       misfiresCyl3: misfiresCyl3 ?? this.misfiresCyl3,
