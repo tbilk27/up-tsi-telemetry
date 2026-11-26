@@ -24,7 +24,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          flutter-version: '3.41.9'
           channel: 'stable'
           cache: true
 
@@ -36,6 +36,7 @@ jobs:
           cp -f android/build.gradle /tmp/mobile_backup/build.gradle || true
           cp -f android/app/build.gradle /tmp/mobile_backup/app_build.gradle || true
           cp -f android/settings.gradle /tmp/mobile_backup/settings.gradle || true
+          cp -f android/gradle.properties /tmp/mobile_backup/gradle.properties || true
 
           flutter create . --platforms=android
 
@@ -43,6 +44,7 @@ jobs:
           cp -f /tmp/mobile_backup/build.gradle android/build.gradle
           cp -f /tmp/mobile_backup/app_build.gradle android/app/build.gradle
           cp -f /tmp/mobile_backup/settings.gradle android/settings.gradle
+          cp -f /tmp/mobile_backup/gradle.properties android/gradle.properties || true
 
       - name: Install Dependencies
         run: |

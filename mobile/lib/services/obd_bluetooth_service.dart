@@ -55,6 +55,8 @@ class ObdBluetoothService extends ChangeNotifier {
 
   bool _isPolling = false;
   bool _autoReconnectAttempted = false;
+  final Set<String> _supportedPids = {};
+  int _barometricKpa = 101;
   double _peakBoost = 0.0;
   double _dynamicPeakBoost = 0.0;
   DateTime _dynamicPeakTimestamp = DateTime.now();
@@ -447,6 +449,86 @@ class ObdBluetoothService extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadSavedBaseOdometer() async {
+    final candidateFiles = [
+      '/data/user/0/com.antigravity.uptsi/files/fuel_log_v1.json',
+      '/data/data/com.antigravity.uptsi/files/fuel_log_v1.json',
+    ];
+    for (final path in candidateFiles) {
+      try {
+        final file = File(path);
+        if (file.existsSync()) {
+          final raw = await file.readAsString();
+          if (raw.isNotEmpty) {
+            final Map<String, dynamic> decoded = jsonDecode(raw);
+            final saved = (decoded['baseOdometer'] as num?)?.toDouble();
+            if (saved != null && saved > 0) {
+              _baseOdometer = saved;
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  void _parseSupportedPidBitmask(int base, String raw) {
+    final clean = _cleanResponse(raw);
+    final baseHex = base.toRadixString(16).toUpperCase().padLeft(2, '0');
+    final match = RegExp('41$baseHex([0-9A-F]{8})').firstMatch(clean);
+    if (match == null) return;
+    final val = int.tryParse(match.group(1)!, radix: 16);
+    if (val == null) return;
+    for (int i = 0; i < 32; i++) {
+      if ((val & (1 << (31 - i))) != 0) {
+        final pidHex = (base + i + 1).toRadixString(16).toUpperCase().padLeft(2, '0');
+        _supportedPids.add(pidHex);
+      }
+    }
+  }
+
+  String? _parseVinResponse(String raw) {
+    final clean = _cleanResponse(raw);
+    // Remove prefixos de frame ISO-TP (ex: 014, 0:, 1:, 2:) e busca 490201
+    final stripped = clean.replaceAll(RegExp(r'^[0-9A-F]{3}(?=0:)'), '').replaceAll(RegExp(r'[0-9]:'), '');
+    final idx = stripped.indexOf('490201');
+    if (idx == -1) return null;
+    final hexVin = stripped.substring(idx + 6);
+    final sb = StringBuffer();
+    for (int i = 0; i + 2 <= hexVin.length && sb.length < 17; i += 2) {
+      final code = int.tryParse(hexVin.substring(i, i + 2), radix: 16);
+      if (code != null && code >= 0x30 && code <= 0x5A) {
+        sb.writeCharCode(code);
+      }
+    }
+    final vin = sb.toString();
+    return vin.length >= 11 ? vin : null;
+  }
+
+  /// Sonda experimental UDS para tentar ler odômetro no módulo do Painel VW (Cluster 714/77E)
+  Future<String> probeVwClusterOdometer() async {
+    if (!_data.isConnected) return 'NÃO CONECTADO AO OBDII';
+    final wasPolling = _isPolling;
+    _isPolling = false;
+    await Future.delayed(const Duration(milliseconds: 120));
+
+    final sb = StringBuffer();
+    try {
+      sb.writeln(await _sendCommand('ATSH714'));
+      sb.writeln(await _sendCommand('ATCRA77E'));
+      sb.writeln(await _sendCommand('22F4A6', timeout: const Duration(milliseconds: 900)));
+      sb.writeln(await _sendCommand('222203', timeout: const Duration(milliseconds: 900)));
+      sb.writeln(await _sendCommand('220202', timeout: const Duration(milliseconds: 900)));
+    } finally {
+      await _sendCommand('ATCRA');
+      await _sendCommand('ATSH7DF');
+      if (wasPolling && _connection != null && _connection!.isConnected) {
+        _startPollingLoop();
+      }
+    }
+    return sb.toString();
+  }
+
   // Connect to a Bluetooth OBD-II device
   Future<void> connect(BluetoothDevice device) async {
     disconnect();
@@ -456,6 +538,10 @@ class ObdBluetoothService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _loadSavedBaseOdometer();
+      _supportedPids.clear();
+      _barometricKpa = 101;
+
       _connection = await BluetoothConnection.toAddress(device.address);
       _initSessionLogFile(device);
       _status = BluetoothStateStatus.initializing;
@@ -480,16 +566,32 @@ class ObdBluetoothService extends ChangeNotifier {
       // Query Battery Voltage & Protocol
       final voltResp = await _sendCommand('ATRV');
       final protoResp = await _sendCommand('ATDP');
-      // Probe supported PID bitmasks, odometer & VIN for diagnostics/logging
-      await _sendCommand('0100');
-      await _sendCommand('0120');
-      await _sendCommand('0140');
-      await _sendCommand('0160');
-      await _sendCommand('0180');
-      await _sendCommand('01A0');
-      await _sendCommand('01A6');
-      await _sendCommand('0131');
-      await _sendCommand('0902', timeout: const Duration(milliseconds: 900));
+
+      // Probe supported PID bitmasks, odometer & VIN
+      _parseSupportedPidBitmask(0x00, await _sendCommand('0100'));
+      if (_supportedPids.contains('20')) {
+        _parseSupportedPidBitmask(0x20, await _sendCommand('0120'));
+      }
+      if (_supportedPids.contains('40')) {
+        _parseSupportedPidBitmask(0x40, await _sendCommand('0140'));
+      }
+      if (_supportedPids.contains('60')) {
+        _parseSupportedPidBitmask(0x60, await _sendCommand('0160'));
+      }
+      if (_supportedPids.contains('80')) {
+        _parseSupportedPidBitmask(0x80, await _sendCommand('0180'));
+      }
+      if (_supportedPids.contains('A0')) {
+        _parseSupportedPidBitmask(0xA0, await _sendCommand('01A0'));
+      }
+      if (_supportedPids.contains('A6')) {
+        await _sendCommand('01A6');
+      }
+      if (_supportedPids.contains('31')) {
+        await _sendCommand('0131');
+      }
+      final vinResp = await _sendCommand('0902', timeout: const Duration(milliseconds: 900));
+      final parsedVin = _parseVinResponse(vinResp);
 
       double initialVolt = 12.3;
       final voltMatch = RegExp(r'(\d+\.?\d*)V', caseSensitive: false).firstMatch(voltResp);
@@ -501,6 +603,9 @@ class ObdBluetoothService extends ChangeNotifier {
         isConnected: true,
         isSimulating: false,
         voltage: initialVolt,
+        vin: parsedVin ?? _data.vin,
+        odometerKm: _baseOdometer,
+        odometerSource: _supportedPids.contains('A6') ? 'ECU (PID 01A6)' : 'Odômetro Calibrado',
         protocol: protoResp.replaceAll(RegExp(r'[\r\n>]'), '').trim(),
       );
 
@@ -653,8 +758,8 @@ class ObdBluetoothService extends ChangeNotifier {
       final val = int.tryParse(mapMatch.group(1)!, radix: 16);
       if (val != null && val > 0) {
         mapKpa = val;
-        // Atmospheric reference: 101 kPa
-        boostBar = double.parse(((mapKpa - 101) / 100.0).toStringAsFixed(2));
+        // Referência barométrica real (PID 0133 quando suportado, senão 101 kPa)
+        boostBar = double.parse(((mapKpa - _barometricKpa) / 100.0).toStringAsFixed(2));
         boostPsi = double.parse((boostBar * 14.5038).toStringAsFixed(1));
         if (boostBar > _peakBoost) _peakBoost = boostBar;
       }
@@ -679,9 +784,11 @@ class ObdBluetoothService extends ChangeNotifier {
       if (val != null) tps = ((val * 100) / 255).round();
     }
 
-    // 4. Medium Priority (every 3 cycles): Load (0104) and Timing (010E)
+    // 4. Medium Priority (every 3 cycles): Load (0104), Timing (010E), Rail (0123), Lambda (0134)
     int load = _data.engineLoad;
     double timing = _data.timingAdvance;
+    double? realRailBar;
+    double? realLambda;
     if (cycle % 3 == 0) {
       final loadRaw = await _sendCommand('0104');
       final loadClean = _cleanResponse(loadRaw);
@@ -698,14 +805,37 @@ class ObdBluetoothService extends ChangeNotifier {
         final val = int.tryParse(timingMatch.group(1)!, radix: 16);
         if (val != null) timing = (val / 2) - 64;
       }
+
+      if (_supportedPids.contains('23')) {
+        final railRaw = await _sendCommand('0123');
+        final railClean = _cleanResponse(railRaw);
+        final railMatch = RegExp(r'4123([0-9A-F]{4})').firstMatch(railClean);
+        if (railMatch != null) {
+          final val = int.tryParse(railMatch.group(1)!, radix: 16);
+          if (val != null) realRailBar = double.parse((val * 0.1).toStringAsFixed(1));
+        }
+      }
+
+      if (_supportedPids.contains('34')) {
+        final lbdRaw = await _sendCommand('0134');
+        final lbdClean = _cleanResponse(lbdRaw);
+        final lbdMatch = RegExp(r'4134([0-9A-F]{4})').firstMatch(lbdClean);
+        if (lbdMatch != null) {
+          final val = int.tryParse(lbdMatch.group(1)!, radix: 16);
+          if (val != null && val > 0) {
+            realLambda = double.parse(((2.0 / 65536.0) * val).toStringAsFixed(2));
+          }
+        }
+      }
     }
 
-    // 5. Low Priority (every 6 cycles): Coolant (0105), IAT (010F), Fuel Trims, Voltage (ATRV)
+    // 5. Low Priority (every 6 cycles): Coolant (0105), IAT (010F), STFT (0106), LTFT (0107), EGT (013C), Voltage (ATRV)
     int coolant = _data.coolant;
     int iat = _data.iat;
     double stft = _data.stft;
     double ltft = _data.ltft;
     double voltage = _data.voltage;
+    int? realEgt;
 
     if (cycle % 6 == 0) {
       final coolRaw = await _sendCommand('0105');
@@ -724,6 +854,36 @@ class ObdBluetoothService extends ChangeNotifier {
         if (val != null) iat = val - 40;
       }
 
+      if (_supportedPids.contains('06')) {
+        final stftRaw = await _sendCommand('0106');
+        final stftClean = _cleanResponse(stftRaw);
+        final stftMatch = RegExp(r'4106([0-9A-F]{2})').firstMatch(stftClean);
+        if (stftMatch != null) {
+          final val = int.tryParse(stftMatch.group(1)!, radix: 16);
+          if (val != null) stft = double.parse((((val - 128) * 100.0) / 128.0).toStringAsFixed(1));
+        }
+      }
+
+      if (_supportedPids.contains('07')) {
+        final ltftRaw = await _sendCommand('0107');
+        final ltftClean = _cleanResponse(ltftRaw);
+        final ltftMatch = RegExp(r'4107([0-9A-F]{2})').firstMatch(ltftClean);
+        if (ltftMatch != null) {
+          final val = int.tryParse(ltftMatch.group(1)!, radix: 16);
+          if (val != null) ltft = double.parse((((val - 128) * 100.0) / 128.0).toStringAsFixed(1));
+        }
+      }
+
+      if (_supportedPids.contains('3C')) {
+        final egtRaw = await _sendCommand('013C');
+        final egtClean = _cleanResponse(egtRaw);
+        final egtMatch = RegExp(r'413C([0-9A-F]{4})').firstMatch(egtClean);
+        if (egtMatch != null) {
+          final val = int.tryParse(egtMatch.group(1)!, radix: 16);
+          if (val != null) realEgt = ((val / 10.0) - 40.0).round();
+        }
+      }
+
       final voltRaw = await _sendCommand('ATRV');
       final voltMatch = RegExp(r'(\d+\.?\d*)V', caseSensitive: false).firstMatch(voltRaw);
       if (voltMatch != null) {
@@ -731,22 +891,45 @@ class ObdBluetoothService extends ChangeNotifier {
       }
     }
 
-    // 6. Infrequent Priority (every 30 cycles ~ 15s): Odômetro (01A6) & Distância pós-DTC (0131)
+    // 6. Infrequent Priority (every 30 cycles ~ 15s): Baro (0133), Etanol (0152), Odômetro (01A6 se suportado), Distância pós-DTC (0131)
     double odoKm = _data.odometerKm > 0 ? _data.odometerKm : (_baseOdometer + _tripDistanceKm);
     String odoSource = _data.odometerSource;
     int distDtc = _data.distanceSinceDtcClearKm;
+    int? realEthanol;
 
     if (cycle % 30 == 1) {
-      final odoRaw = await _sendCommand('01A6', timeout: const Duration(milliseconds: 600));
-      final odoClean = _cleanResponse(odoRaw);
-      final odoMatch = RegExp(r'41A6([0-9A-F]{8})').firstMatch(odoClean);
-      if (odoMatch != null) {
-        final hex = odoMatch.group(1)!;
-        final rawVal = int.tryParse(hex, radix: 16);
-        if (rawVal != null && rawVal > 0) {
-          odoKm = double.parse((rawVal / 10.0).toStringAsFixed(1));
-          odoSource = 'ECU (PID 01A6)';
-          _baseOdometer = odoKm;
+      if (_supportedPids.contains('33')) {
+        final baroRaw = await _sendCommand('0133');
+        final baroClean = _cleanResponse(baroRaw);
+        final baroMatch = RegExp(r'4133([0-9A-F]{2})').firstMatch(baroClean);
+        if (baroMatch != null) {
+          final val = int.tryParse(baroMatch.group(1)!, radix: 16);
+          if (val != null && val >= 50 && val <= 110) _barometricKpa = val;
+        }
+      }
+
+      if (_supportedPids.contains('52')) {
+        final ethRaw = await _sendCommand('0152');
+        final ethClean = _cleanResponse(ethRaw);
+        final ethMatch = RegExp(r'4152([0-9A-F]{2})').firstMatch(ethClean);
+        if (ethMatch != null) {
+          final val = int.tryParse(ethMatch.group(1)!, radix: 16);
+          if (val != null) realEthanol = ((val * 100) / 255).round();
+        }
+      }
+
+      if (_supportedPids.contains('A6')) {
+        final odoRaw = await _sendCommand('01A6', timeout: const Duration(milliseconds: 600));
+        final odoClean = _cleanResponse(odoRaw);
+        final odoMatch = RegExp(r'41A6([0-9A-F]{8})').firstMatch(odoClean);
+        if (odoMatch != null) {
+          final hex = odoMatch.group(1)!;
+          final rawVal = int.tryParse(hex, radix: 16);
+          if (rawVal != null && rawVal > 0) {
+            odoKm = double.parse((rawVal / 10.0).toStringAsFixed(1));
+            odoSource = 'ECU (PID 01A6)';
+            _baseOdometer = odoKm;
+          }
         }
       } else {
         odoKm = double.parse((_baseOdometer + _tripDistanceKm).toStringAsFixed(1));
@@ -755,12 +938,14 @@ class ObdBluetoothService extends ChangeNotifier {
         }
       }
 
-      final dtcDistRaw = await _sendCommand('0131', timeout: const Duration(milliseconds: 600));
-      final dtcDistClean = _cleanResponse(dtcDistRaw);
-      final dtcDistMatch = RegExp(r'4131([0-9A-F]{4})').firstMatch(dtcDistClean);
-      if (dtcDistMatch != null) {
-        final rawVal = int.tryParse(dtcDistMatch.group(1)!, radix: 16);
-        if (rawVal != null) distDtc = rawVal;
+      if (_supportedPids.contains('31')) {
+        final dtcDistRaw = await _sendCommand('0131', timeout: const Duration(milliseconds: 600));
+        final dtcDistClean = _cleanResponse(dtcDistRaw);
+        final dtcDistMatch = RegExp(r'4131([0-9A-F]{4})').firstMatch(dtcDistClean);
+        if (dtcDistMatch != null) {
+          final rawVal = int.tryParse(dtcDistMatch.group(1)!, radix: 16);
+          if (rawVal != null) distDtc = rawVal;
+        }
       }
     } else {
       if (odoSource != 'ECU (PID 01A6)') {
@@ -781,7 +966,16 @@ class ObdBluetoothService extends ChangeNotifier {
       coolant: coolant,
       iat: iat,
       dtSeconds: 0.1,
+      realLambda: realLambda,
     );
+
+    final double effectiveRail = realRailBar ?? (cycle % 3 == 0 ? adv['railBar'] : _data.fuelRailPressureBar);
+    final double effectiveLambda = realLambda ?? (cycle % 3 == 0 ? adv['lambda'] : _data.lambda);
+    final double effectiveAfr = realLambda != null
+        ? double.parse((realLambda * 14.7).toStringAsFixed(1))
+        : (cycle % 3 == 0 ? adv['afr'] : _data.afr);
+    final int effectiveEgt = realEgt ?? (cycle % 6 == 0 ? adv['egt'] : _data.egt);
+    final int effectiveEthanol = realEthanol ?? (cycle % 30 == 1 ? adv['ethanol'] : _data.ethanolPercent);
 
     _data = _data.copyWith(
       rpm: rpm,
@@ -806,18 +1000,18 @@ class ObdBluetoothService extends ChangeNotifier {
       estimatedTorqueKgfm: adv['torqueKgfm'],
       peakHp: adv['peakHp'],
       peakTorqueKgfm: adv['peakTorqueKgfm'],
-      fuelRailPressureBar: adv['railBar'],
-      lambda: adv['lambda'],
-      afr: adv['afr'],
+      fuelRailPressureBar: effectiveRail,
+      lambda: effectiveLambda,
+      afr: effectiveAfr,
       oilTemperature: adv['oilTemp'],
-      egt: adv['egt'],
+      egt: effectiveEgt,
       fuelConsumptionLh: adv['fuelLh'],
       fuelConsumptionKml: adv['fuelKml'],
       avgFuelConsumptionKml: adv['avgKml'],
       totalFuelConsumedLiters: adv['totalFuel'],
       tripDistanceKm: adv['tripKm'],
       tripDurationMinutes: adv['tripMinutes'],
-      ethanolPercent: adv['ethanol'],
+      ethanolPercent: effectiveEthanol,
       odometerKm: odoKm,
       odometerSource: odoSource,
       distanceSinceDtcClearKm: distDtc,
@@ -845,6 +1039,7 @@ class ObdBluetoothService extends ChangeNotifier {
     required int coolant,
     required int iat,
     required double dtSeconds,
+    double? realLambda,
   }) {
     // 1. Motor displacement & Max limits according to profile
     final double disp = (_vehicleProfile.contains('Sorento') || _vehicleProfile.contains('3.5 V6'))
@@ -881,9 +1076,10 @@ class ObdBluetoothService extends ChangeNotifier {
     final double railBar = (45.0 + (load * 1.15) + (boostBar > 0 ? boostBar * 45.0 : 0.0)).clamp(40.0, 210.0);
 
     // 4. Sonda Lambda & AFR
-    final double lambda = (tps < 3 && rpm > 1700)
-        ? 1.25 // Cut-off freio motor
-        : (load > 80 ? (0.83 + sin(rpm * 0.001) * 0.02) : (1.00 + sin(rpm * 0.002) * 0.01));
+    final double lambda = realLambda ??
+        ((tps < 3 && rpm > 1700)
+            ? 1.25 // Cut-off freio motor
+            : (load > 80 ? (0.83 + sin(rpm * 0.001) * 0.02) : (1.00 + sin(rpm * 0.002) * 0.01)));
     final double afr = lambda * 14.7;
 
     // 5. Temperaturas (Óleo e EGT)

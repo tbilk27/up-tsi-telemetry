@@ -204,6 +204,23 @@ class _ObdTerminalScreenState extends State<ObdTerminalScreen> {
                 _buildQuickChip(obd, '0100', 'PIDs Suportados'),
                 _buildQuickChip(obd, 'ATDP', 'Protocolo'),
                 _buildQuickChip(obd, 'ATRV', 'Tensão'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                  child: ActionChip(
+                    backgroundColor: const Color(0xFF1E283B),
+                    side: const BorderSide(color: Color(0xFF00A8FF)),
+                    label: const Text(
+                      'Sondar Odômetro VW',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () async {
+                      final resp = await obd.probeVwClusterOdometer();
+                      if (mounted) {
+                        setState(() => _lastManualResponse = resp.replaceAll('\r', ' ').trim());
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
           ),
